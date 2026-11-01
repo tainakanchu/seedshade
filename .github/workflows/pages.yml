@@ -1,0 +1,98 @@
+name: Deploy Site (LP + Docs) to GitHub Pages
+
+# GitHub Pages はランディングページ (site/) とドキュメント (website/) だけを配信する。
+# アプリ本体は Cloudflare Workers (https://seedshade.tainakanchu.com) で配信しているので、
+# ここではビルドしない。
+#   https://tainakanchu.github.io/seedshade/       <- site/
+#   https://tainakanchu.github.io/seedshade/docs/  <- website/dist (Astro + Starlight)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'site/**'
+      - 'website/**'
+      - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'site/**'
+      - 'website/**'
+      - '.github/workflows/pages.yml'
+  # Actions タブから手動実行も可能にする
+  workflow_dispatch:
+
+# ワークフロー全体は読み取り専用（fork からの PR でも build が動くように）。
+# デプロイ job だけ pages / id-token の権限を上げる。
+permissions:
+  contents: read
+
+concurrency:
+  # デプロイ（push / workflow_dispatch）は専用グループで直列に実行し、進行中のものはキャンセルしない。
+  # PR のビルドは PR ごとのグループで、古い実行だけキャンセルする。
+  group: pages-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # pnpm のバージョンはルート package.json の packageManager フィールドから決まる
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+
+      # ドキュメント (Astro + Starlight) は website/ の独立した lockfile でビルドする
+      - name: Install docs dependencies
+        working-directory: website
+        run: pnpm install --frozen-lockfile
+
+      - name: Build docs
+        working-directory: website
+        run: pnpm build
+
+      # LP (site/) をルートに、ドキュメント (website/dist) を /docs/ 配下に合成する
+      - name: Assemble site (LP at root, docs under /docs)
+        run: |
+          rm -rf _site
+          mkdir -p _site/docs
+          cp -r site/. _site/
+          cp -r website/dist/. _site/docs/
+          touch _site/.nojekyll
+
+      # Pages への upload / deploy は main への push と手動実行のときだけ
+      - name: Setup Pages
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

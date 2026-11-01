@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Seedshade — seed から GLSL を合成する、音に反応する VJ ツール</title>
+    <meta
+      name="description"
+      content="Seedshade は seed の文字列から GLSL シェーダを合成し、音に合わせて描くブラウザだけで動く VJ ツール。127 種類の Generator、ビート / BPM 検出、OBS 向けの透過背景、Scene Deck と MIDI、AI からの演出操作に対応。"
+    />
+    <link rel="icon" type="image/svg+xml" href="./assets/icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png" />
+    <link rel="apple-touch-icon" href="./assets/icon-180.png" />
+    <link rel="canonical" href="https://tainakanchu.github.io/seedshade/" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Seedshade" />
+    <meta property="og:url" content="https://tainakanchu.github.io/seedshade/" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:locale:alternate" content="zh_TW" />
+    <meta property="og:title" content="Seedshade — seed から GLSL を合成する VJ ツール" />
+    <meta
+      property="og:description"
+      content="seed の文字列から GLSL シェーダを合成し、音に合わせて描く。ブラウザだけで動く VJ ツール。"
+    />
+    <meta property="og:image" content="https://tainakanchu.github.io/seedshade/assets/og.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Seedshade — seed から合成したシェーダのフレーム" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Seedshade — seed から GLSL を合成する VJ ツール" />
+    <meta
+      name="twitter:description"
+      content="seed の文字列から GLSL シェーダを合成し、音に合わせて描く。ブラウザだけで動く VJ ツール。"
+    />
+    <meta name="twitter:image" content="https://tainakanchu.github.io/seedshade/assets/og.png" />
+    <meta name="twitter:image:alt" content="Seedshade — seed から合成したシェーダのフレーム" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main" data-i18n="nav.skip">本文へ移動</a>
+
+    <!-- ===================== NAV ===================== -->
+    <header class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="#top" aria-label="Seedshade">
+          <img src="./assets/icon.svg" alt="" width="28" height="28" />
+          <span>seedshade</span>
+        </a>
+        <button
+          class="nav-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="nav-links"
+          data-i18n-aria="nav.menu"
+          aria-label="メニュー"
+        >
+          <span></span><span></span>
+        </button>
+        <nav class="nav-links" id="nav-links">
+          <a href="#how" data-i18n="nav.how">仕組み</a>
+          <a href="#gallery" data-i18n="nav.gallery">ギャラリー</a>
+          <a href="#live" data-i18n="nav.live">本番で使う</a>
+          <a href="#ai" data-i18n="nav.ai">AI 操縦</a>
+          <a href="./docs/" data-i18n="nav.docs">使い方</a>
+          <a href="https://github.com/tainakanchu/seedshade" rel="noopener">GitHub</a>
+          <div class="lang" role="group" aria-label="Language">
+            <button type="button" data-lang="ja" aria-pressed="true">日本語</button>
+            <button type="button" data-lang="en" aria-pressed="false">EN</button>
+            <button type="button" data-lang="zh-Hant" aria-pressed="false">繁中</button>
+          </div>
+          <a class="btn btn-primary nav-cta" href="https://seedshade.tainakanchu.com" data-i18n="cta.open"
+            >アプリを開く</a
+          >
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ===================== HERO ===================== -->
+      <section class="hero" id="top">
+        <div class="hero-visual" aria-hidden="true">
+          <img class="hero-fallback" src="./assets/hero.webp" alt="" width="1600" height="900" />
+          <canvas class="hero-canvas"></canvas>
+        </div>
+        <div class="hero-shade" aria-hidden="true"></div>
+        <div class="hero-body">
+          <h1 class="wordmark">seedshade</h1>
+          <p class="hero-lead" data-i18n="hero.lead">
+            seed の文字列から GLSL シェーダを合成し、音に合わせて描く。ブラウザだけで動く VJ ツールです。
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://seedshade.tainakanchu.com" data-i18n="cta.open"
+              >アプリを開く</a
+            >
+            <a class="btn btn-ghost" href="./docs/" data-i18n="cta.docs">使い方を読む</a>
+            <a class="btn btn-ghost" href="https://github.com/tainakanchu/seedshade" rel="noopener"
+              >GitHub</a
+            >
+          </div>
+          <div class="readout">
+            <button class="reroll" type="button" aria-describedby="readout-note">
+              <kbd>R</kbd><span data-i18n="hero.reroll">引き直す</span>
+            </button>
+            <code class="readout-seed" aria-live="polite">caustics</code>
+            <span class="readout-note" id="readout-note" data-i18n="hero.note"
+              >背景はアプリの caustics Generator をこのページ用に移植したものです。</span
+            >
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== HOW ===================== -->
+      <section class="section" id="how" aria-labelledby="how-title">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 id="how-title" data-i18n="how.title">seed から、1 本のシェーダへ</h2>
+            <p data-i18n="how.body">
+              seed を入れると、127 種類の Generator から組み合わせが決定的に選ばれ、1 本のフラグメントシェーダに組み上がります。同じ seed なら、いつ開いても同じ見た目。気に入った画は seed の文字列を控えておけば再現できます。
+            </p>
+          </div>
+
+          <ol class="chain">
+            <li class="chain-step">
+              <span class="chain-label" data-i18n="how.s1">seed を入れる</span>
+              <code class="chain-seed">iris-engine-404</code>
+            </li>
+            <li class="chain-step">
+              <span class="chain-label" data-i18n="how.s2">Generator を選んで重ねる</span>
+              <ul class="ops">
+                <li><code>wires</code><span class="cat cat-source">source</span></li>
+                <li><code>busJacquard</code><span class="cat cat-source">source</span></li>
+                <li><code>noise</code><span class="cat cat-field">field</span></li>
+                <li><code>mirror</code><span class="cat cat-modifier">modifier</span></li>
+                <li><code>scanSlip</code><span class="cat cat-modifier">modifier</span></li>
+                <li><code>crt</code><span class="cat cat-material">material</span></li>
+              </ul>
+            </li>
+            <li class="chain-step">
+              <span class="chain-label" data-i18n="how.s3">GLSL に組み立てる</span>
+              <p class="chain-note" data-i18n="how.s3body">
+                選ばれた Generator のコードを 1 本のフラグメントシェーダにまとめ、音の解析値を uniform で流し込みます。
+              </p>
+            </li>
+            <li class="chain-step chain-frame">
+              <span class="chain-label" data-i18n="how.s4">音に合わせて描く</span>
+              <img
+                src="./assets/gallery/iris-engine-404.webp"
+                width="960"
+                height="540"
+                loading="lazy"
+                alt="seed iris-engine-404 のフレーム"
+                data-i18n-alt="how.alt"
+              />
+            </li>
+          </ol>
+
+          <dl class="cats">
+            <div>
+              <dt><span class="cat cat-source">source</span> 60</dt>
+              <dd data-i18n="how.cat.source">形を生む。線、格子、粒子、SDF の立体、スペクトラム。</dd>
+            </div>
+            <div>
+              <dt><span class="cat cat-field">field</span> 17</dt>
+              <dd data-i18n="how.cat.field">ノイズや流れなど、面に広がる場。</dd>
+            </div>
+            <div>
+              <dt><span class="cat cat-modifier">modifier</span> 23</dt>
+              <dd data-i18n="how.cat.modifier">鏡像、万華鏡、ずれ、渦。座標を曲げる。</dd>
+            </div>
+            <div>
+              <dt><span class="cat cat-material">material</span> 27</dt>
+              <dd data-i18n="how.cat.material">CRT、リソグラフ、網点、金箔。最後の質感。</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <!-- ===================== GALLERY ===================== -->
+      <section class="section" id="gallery" aria-labelledby="gallery-title">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 id="gallery-title" data-i18n="gallery.title">同じエンジン、別の seed</h2>
+            <p data-i18n="gallery.body">
+              どれもアプリに seed を入れて撮ったフレームです。キャプションは seed と、そこから選ばれた Generator。
+            </p>
+          </div>
+          <div class="gallery">
+            <figure class="shot shot-wide">
+              <img src="./assets/gallery/laser-fern-090.webp" width="960" height="540" loading="lazy" alt="" />
+              <figcaption><code>laser-fern-090</code><span>mooringRope › ripple › scanSlip › brakeLightRain</span></figcaption>
+            </figure>
+            <figure class="shot">
+              <img src="./assets/gallery/jade-pulse-616.webp" width="960" height="540" loading="lazy" alt="" />
+              <figcaption><code>jade-pulse-616</code><span>concentric › sunburst › typhoonShear › sleeperRail › slice › karaokeLcd</span></figcaption>
+            </figure>
+            <figure class="shot">
+              <img src="./assets/gallery/acid-lotus-301.webp" width="960" height="540" loading="lazy" alt="" />
+              <figcaption><code>acid-lotus-301</code><span>kumiko › spectrumRadial › scooterSlipstream › pulse › xerox › goldfoil</span></figcaption>
+            </figure>
+            <figure class="shot">
+              <img src="./assets/gallery/dawn-relay-149.webp" width="960" height="540" loading="lazy" alt="" />
+              <figcaption><code>dawn-relay-149</code><span>auroraCurtain › chainlink › scooterSlipstream › slice › crt</span></figcaption>
+            </figure>
+            <figure class="shot">
+              <img src="./assets/gallery/glass-koi-128.webp" width="960" height="540" loading="lazy" alt="" />
+              <figcaption><code>glass-koi-128</code><span>sdfTunnel › xerox › corruptSave › riso</span></figcaption>
+            </figure>
+            <figure class="shot">
+              <img src="./assets/gallery/nova-harbor-010.webp" width="960" height="540" loading="lazy" alt="" />
+              <figcaption><code>nova-harbor-010</code><span>chainlink › humidityLens › sway › threshold › slice › halftone › bathroomGlaze</span></figcaption>
+            </figure>
+            <figure class="shot">
+              <img src="./assets/gallery/ember-loom-033.webp" width="960" height="540" loading="lazy" alt="" />
+              <figcaption><code>ember-loom-033</code><span>concentric › kumiko › threshold › dropout › macroblock › goldfoil</span></figcaption>
+            </figure>
+            <figure class="shot">
+              <img src="./assets/gallery/solar-koi-909.webp" width="960" height="540" loading="lazy" alt="" />
+              <figcaption><code>solar-koi-909</code><span>spectrumBars › fanGuard › pulse › invert › freezerCyan</span></figcaption>
+            </figure>
+            <figure class="shot">
+              <img src="./assets/gallery/cobalt-fern-214.webp" width="960" height="540" loading="lazy" alt="" />
+              <figcaption><code>cobalt-fern-214</code><span>wires › harborBackwash › coneField › interlaceComb › neon</span></figcaption>
+            </figure>
+          </div>
+
+          <div class="catalog">
+            <div class="catalog-text">
+              <h3 data-i18n="gallery.sheetTitle">カタログの 127 Generator</h3>
+              <p data-i18n-html="gallery.sheetBody">
+                <code>pnpm vj:preview --contact-sheet</code> で書き出した一覧です。Generator を 1 つずつ、既定のパラメータで単独描画しています。Patch を組む前に、まずここで目で選びます。
+              </p>
+              <a class="text-link" href="./assets/gallery/contact-sheet.webp" data-i18n="gallery.sheetOpen"
+                >原寸で開く</a
+              >
+            </div>
+            <a class="catalog-sheet" href="./assets/gallery/contact-sheet.webp">
+              <img
+                src="./assets/gallery/contact-sheet.webp"
+                width="1232"
+                height="1512"
+                loading="lazy"
+                alt="127 種類の Generator を単独で描いたコンタクトシート"
+                data-i18n-alt="gallery.sheetAlt"
+              />
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== FEATURES ===================== -->
+      <section class="section" id="features" aria-labelledby="features-title">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 id="features-title" data-i18n="features.title">音を聴いて、絵が変わる</h2>
+          </div>
+          <dl class="features">
+            <div class="feature">
+              <dt data-i18n="f.gacha.t">look gacha</dt>
+              <dd data-i18n-html="f.gacha.d">
+                <kbd>R</kbd> で seed を引き直すと、配色、構図、Generator の組み合わせまでまとめて変わります。切り替えはクロスフェード。<kbd>D</kbd> なら構成はそのままに細部だけ引き直します。
+              </dd>
+            </div>
+            <div class="feature">
+              <dt data-i18n="f.audio.t">音への反応</dt>
+              <dd data-i18n="f.audio.d">
+                マイク、ライン入力、ループバックを解析します。bass / mid / treble が Patch のパラメータを動かし、拍で起きるグリッチの種類は Patch ごとに決まります。無音ではほぼ止まり、大音量が続いても画面が暗く沈むことはありません。
+              </dd>
+            </div>
+            <div class="feature">
+              <dt data-i18n="f.tempo.t">テンポ同期</dt>
+              <dd data-i18n="f.tempo.d">
+                低域のオンセットから BPM を推定してビートグリッドを作ります。ブレイク中も拍を刻み続け、TAP で手動指定もできます。N 小節ごとの自動ガチャも拍に合わせて進みます。
+              </dd>
+            </div>
+            <div class="feature">
+              <dt data-i18n="f.textures.t">スペクトラムと波形</dt>
+              <dd data-i18n-html="f.textures.d">
+                128 バンドのスペクトラムと 256 サンプルの波形を GPU に送り、<code>spectrumBars</code>、<code>oscilloscope</code>、<code>lissajousScope</code> などの Generator が直接読みます。
+              </dd>
+            </div>
+            <div class="feature">
+              <dt data-i18n="f.timeline.t">Timeline</dt>
+              <dd data-i18n="f.timeline.d">
+                seed の変更やトランジションを N 秒後、N 小節後に予約できます。演出を記録して JSON に書き出し、あとから再生することもできます。
+              </dd>
+            </div>
+            <div class="feature">
+              <dt data-i18n="f.images.t">画像を素材に</dt>
+              <dd data-i18n="f.images.d">
+                PNG / JPG / WebP / SVG をページにドロップすると、Patch が読む画像として使えます。
+              </dd>
+            </div>
+            <div class="feature">
+              <dt data-i18n="f.perf.t">内蔵 GPU で 1080p</dt>
+              <dd data-i18n="f.perf.d">
+                ノート PC の内蔵 GPU での常用を想定しています。重くなると内部解像度を段階的に下げてフレームレートを保ち、余裕が戻れば元に戻します。
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <!-- ===================== LIVE ===================== -->
+      <section class="section" id="live" aria-labelledby="live-title">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 id="live-title" data-i18n="live.title">本番の卓で</h2>
+            <p data-i18n-html="live.body">
+              メイン窓は <code>?ui=hide</code> でフルスクリーンにしてプロジェクターへ。操作は手元の別窓から行います。
+            </p>
+          </div>
+
+          <div class="live-rows">
+            <div class="live-row">
+              <figure class="screen">
+                <img
+                  src="./assets/shots/app-main.webp"
+                  width="1440"
+                  height="900"
+                  loading="lazy"
+                  alt="Seedshade のメイン画面。左にコントロールパネル、右に Timeline パネル"
+                  data-i18n-alt="live.mainAlt"
+                />
+              </figure>
+              <div class="live-text">
+                <h3 data-i18n="live.main.t">メイン窓</h3>
+                <p data-i18n="live.mainCap">
+                  左がコントロールパネル、右が Timeline。パネルはマウスを止めると消え、H で隠せます。
+                </p>
+              </div>
+            </div>
+
+            <div class="live-row">
+              <figure class="screen">
+                <img
+                  src="./assets/shots/app-deck.webp"
+                  width="1280"
+                  height="1040"
+                  loading="lazy"
+                  alt="Scene Deck 窓。8 つのスロットにサムネイルが並ぶ"
+                  data-i18n-alt="live.deckAlt"
+                />
+                <figcaption data-i18n="live.deckCap">
+                  BPM 121 でロックし、8 スロットのサムネイルが並んだところ。
+                </figcaption>
+              </figure>
+              <div class="live-text">
+                <h3 data-i18n="live.deck.t">Scene Deck</h3>
+                <p data-i18n-html="live.deck.d">
+                  いまの Patch から 8 面のバリエーションを作り、<kbd>1</kbd>〜<kbd>8</kbd> でポン出しする別窓の操作卓です。秒や小節での自動送り、手札の保存（A〜H）、JSON での持ち運びもできます。Deck 窓では音声解析も描画ループも起動しないので、マイクの許可も常時の GPU 負荷もありません。
+                </p>
+                <h3 data-i18n="live.midi.t">MIDI</h3>
+                <p data-i18n="live.midi.d">
+                  Deck は Web MIDI を受けます。nanoPAD2 は Native モードで自動マップ、ほかのコントローラは learn で割り当て。Deck が背面にあっても反応します。
+                </p>
+              </div>
+            </div>
+
+            <div class="live-row">
+              <div class="overlay-stage" data-backdrop="checker">
+                <img
+                  src="./assets/shots/overlay.webp"
+                  width="1280"
+                  height="720"
+                  loading="lazy"
+                  alt="背景を透過にしたフレーム"
+                  data-i18n-alt="live.overlayAlt"
+                />
+              </div>
+              <div class="live-text">
+                <h3 data-i18n="live.obs.t">OBS にそのまま重ねる</h3>
+                <p data-i18n-html="live.obs.d">
+                  <code>?bg=transparent&amp;ui=hide</code> を付けて OBS のブラウザソースに入れると、背景は透過のまま出力されます。<code>?mirror=1</code> の表示専用窓を足せば、複数の画面に同じ映像を出せます。
+                </p>
+                <div class="backdrops" role="group" aria-label="背景" data-i18n-aria="live.bgLabel">
+                  <span data-i18n="live.bgLabel">背景</span>
+                  <button type="button" data-backdrop="checker" aria-pressed="true" data-i18n="live.bg.checker">市松</button>
+                  <button type="button" data-backdrop="paper" aria-pressed="false" data-i18n="live.bg.paper">白</button>
+                  <button type="button" data-backdrop="stage" aria-pressed="false" data-i18n="live.bg.stage">青</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== AI ===================== -->
+      <section class="section" id="ai" aria-labelledby="ai-title">
+        <div class="wrap ai-grid">
+          <div class="ai-text">
+            <h2 id="ai-title" data-i18n="ai.title">演出を AI に任せる</h2>
+            <p data-i18n="ai.body">
+              中継（ローカルの bridge か、Cloudflare Workers の room）越しに、CLI からパネルと同じ操作ができます。Claude Code 用のスキル vj-director を同梱しているので、「サビで青く静かに」と頼めば、気分語から Patch を合成して小節単位で予約するところまで、AI が CLI を叩いて進めます。
+            </p>
+            <ul class="tools">
+              <li><code>vj:gen</code><span data-i18n="ai.gen">気分語から Patch を合成する</span></li>
+              <li><code>vj:tweak</code><span data-i18n="ai.tweak">いまの Patch の一部だけ差し替える</span></li>
+              <li><code>vj:recipe</code><span data-i18n="ai.recipe">ムードと seed と差分を JSON で持ち回る</span></li>
+              <li><code>vj:set</code><span data-i18n="ai.set">セットを cue として仕込み、本番で順に出す</span></li>
+              <li><code>vj:preview</code><span data-i18n="ai.preview">Patch を PNG に描いて、送る前に確かめる</span></li>
+            </ul>
+          </div>
+          <div class="terminal" role="figure" aria-label="CLI の例" data-i18n-aria="ai.termLabel">
+            <pre><code><span class="c" data-i18n="ai.c1"># room を作り、返ってきた pageUrl をブラウザで開く</span>
+<span class="p">$</span> node scripts/vj-ctl.mjs room --host seedshade.tainakanchu.com
+
+<span class="c" data-i18n="ai.c2"># 気分語から Patch を合成して送る</span>
+<span class="p">$</span> export VJ_URL=wss://seedshade.tainakanchu.com/room/&lt;id&gt;
+<span class="p">$</span> pnpm vj:gen "雲 静寂 青"
+
+<span class="c" data-i18n="ai.c3"># 8 小節後に、ゆっくり別の seed へ</span>
+<span class="p">$</span> node scripts/vj-ctl.mjs --url $VJ_URL \
+    event add --bar 8 --seed take-2 --transition slow</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== QUICK START ===================== -->
+      <section class="section" id="start" aria-labelledby="start-title">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 id="start-title" data-i18n="start.title">3 ステップで始める</h2>
+          </div>
+          <ol class="steps">
+            <li>
+              <h3 data-i18n="start.s1.t">アプリを開く</h3>
+              <p data-i18n-html="start.s1.d">
+                <a href="https://seedshade.tainakanchu.com">seedshade.tainakanchu.com</a> を WebGL2 が使えるブラウザで開きます。インストールは要りません。
+              </p>
+            </li>
+            <li>
+              <h3 data-i18n="start.s2.t">マイクを許可する</h3>
+              <p data-i18n="start.s2.d">
+                許可すると、すぐに音へ反応し始めます。流している曲に反応させたいときは、Input device でループバックを選びます。始まらなければパネルの「Click to start audio」を押してください。
+              </p>
+            </li>
+            <li>
+              <h3 data-i18n="start.s3.t">R を押す</h3>
+              <p data-i18n-html="start.s3.d">
+                気に入る画が出るまで引き直します。<kbd>H</kbd> でパネルを隠し、<kbd>F</kbd> でフルスクリーン、<kbd>S</kbd> で Scene Deck。
+              </p>
+            </li>
+          </ol>
+          <div class="start-cta">
+            <a class="btn btn-primary" href="https://seedshade.tainakanchu.com" data-i18n="cta.open">アプリを開く</a>
+            <a class="btn btn-ghost" href="./docs/" data-i18n="cta.docs">使い方を読む</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== REQUIREMENTS ===================== -->
+      <section class="section section-tight" id="requirements" aria-labelledby="req-title">
+        <div class="wrap req">
+          <h2 id="req-title" data-i18n="req.title">動作環境</h2>
+          <ul>
+            <li data-i18n="req.webgl">WebGL2 が使えるブラウザ。使えない環境では何も描画されません。</li>
+            <li data-i18n="req.audio">
+              マイク、またはループバック デバイス（Windows は VB-CABLE、macOS は BlackHole、Linux は PipeWire / PulseAudio の Monitor）。
+            </li>
+            <li data-i18n="req.midi">
+              MIDI を使うなら Chrome か Edge。Firefox はアドオンが必要で、Safari は非対応です。
+            </li>
+            <li data-i18n="req.local">音声の解析はブラウザの中だけで行われ、音はどこにも送られません。</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <!-- ===================== FOOTER ===================== -->
+    <footer class="footer">
+      <div class="wrap footer-inner">
+        <div class="footer-brand">
+          <span class="footer-mark">seedshade</span>
+          <p data-i18n="footer.built">React と素の WebGL2 で作っています。</p>
+        </div>
+        <nav class="footer-links" aria-label="Footer">
+          <a href="https://seedshade.tainakanchu.com" data-i18n="cta.open">アプリを開く</a>
+          <a href="./docs/" data-i18n="nav.docs">使い方</a>
+          <a href="https://github.com/tainakanchu/seedshade" rel="noopener">GitHub</a>
+        </nav>
+        <p class="footer-copy">© 2026 tainakanchu</p>
+      </div>
+    </footer>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>

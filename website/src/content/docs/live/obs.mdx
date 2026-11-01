@@ -1,0 +1,83 @@
+---
+title: OBS・透過・デスクトップ音声
+description: OBS のブラウザソースで透過オーバーレイとして使う方法と、再生中の曲に反応させる方法。
+---
+
+import { Steps, Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+## OBS のブラウザソースで使う
+
+<Steps>
+
+1. OBS で **ソース → 追加 → ブラウザ** を選びます。
+2. **URL** に Seedshade のアドレスを入れます。オーバーレイとして重ねるなら、透過背景・パネル非表示が便利です。
+
+   ```
+   https://seedshade.tainakanchu.com/?bg=transparent&ui=hide
+   ```
+
+   見た目を固定したいなら `&seed=<シード>`、反応の強さは `&gain=2` のように足せます（[URL パラメータ](../../reference/url-params/)）。
+3. **幅 / 高さ** を出力解像度（例: 1920 × 1080）に合わせます。
+4. `bg=transparent` を付けておけば背景は透過のままなので、ほかのソースの上に重ねられます。
+
+</Steps>
+
+<Aside type="caution" title="ブラウザソースで音を拾えないことがあります">
+  Seedshade はページの中で `getUserMedia`（ブラウザの音声入力）を使って音を解析します。OBS の「ページの音声を OBS で制御」とは関係ありません。
+  OBS のブラウザソースでは、ふつうのブラウザのようなマイク許可ダイアログが出ないため、環境によっては音声入力が取れず、映像が音に反応しません。
+
+  その場合は次のどちらかにしてください。
+
+  - **ふつうのブラウザで Seedshade を開き、OBS の「ウィンドウキャプチャ」で取り込む**（透過は使えないので、黒背景のまま「クロマキー」や「ブレンド: 加算 / スクリーン」で重ねます）。
+  - OBS 側の起動オプションなどでブラウザソースのメディア許可を有効にする（OBS 側の設定で、Seedshade の機能ではありません。動作は OBS のバージョンや OS に依存します）。
+</Aside>
+
+<Aside type="tip">
+  ブラウザソースで **▶ Click to start audio** を押す必要があるときは、OBS でソースを右クリック → **対話** を開いて、パネルを操作できます（`?ui=hide` のときは対話ウィンドウ内で `H` を押すとパネルが出ます）。
+</Aside>
+
+## 透過背景について
+
+- 背景は **Background** の `Black` / `Transparent`、キーボードの **`B`**、URL の `?bg=transparent` で切り替えます。
+- 透過にすると、描画結果もアルファ付きのまま出力されます。何も描かれていない部分は透けます。
+- 生成される絵は Patch によって「画面を埋めるもの」と「余白が多いもの」があります。オーバーレイ用途では、余白の多い絵が出たシードを控えておくと使いやすいです。
+
+## デスクトップ音声に反応させる
+
+ブラウザの音声入力は、そのままではマイクの音しか拾いません。PC で再生中の曲や DAW の音に反応させるには、**ループバック（仮想オーディオデバイス）** を作って、Seedshade の **Input device** でそれを選びます。
+
+<Tabs>
+<TabItem label="Windows">
+
+[VB-CABLE](https://vb-audio.com/Cable/) などの仮想オーディオデバイスを入れます。
+
+1. 音を出すアプリ（または Windows の既定の再生デバイス）の出力先を **CABLE Input** にします。
+2. Seedshade の **Input device** で **CABLE Output** を選びます。
+3. 自分でも音を聞きたい場合は、Windows のサウンド設定で CABLE Output の「このデバイスを聴く」を使うなどして、スピーカーにも流します。
+
+</TabItem>
+<TabItem label="macOS">
+
+[BlackHole](https://existential.audio/blackhole/) や Loopback などを入れます。
+
+1. 「Audio MIDI 設定」で、スピーカーと BlackHole をまとめた「複数出力装置」を作り、再生先にします。
+2. Seedshade の **Input device** で **BlackHole** を選びます。
+
+</TabItem>
+<TabItem label="Linux">
+
+PulseAudio / PipeWire では、出力デバイスの **Monitor**（例: `Monitor of ...`）が入力として見えます。
+Seedshade の **Input device** でそれを選ぶと、デスクトップの音を取り込めます。
+
+</TabItem>
+</Tabs>
+
+<Aside type="note">
+  Seedshade は音声入力のエコーキャンセル・ノイズ抑制・自動ゲインをすべてオフにして取り込みます。ライン入力の音がそのまま解析されます。
+  入力デバイスの一覧は、音声入力を一度許可したあとにデバイス名付きで表示されます。デバイスを抜き差しすると一覧は自動で更新されます。
+</Aside>
+
+## DJ ミキサーの音を使う
+
+現場では、DJ ミキサーのブース出力や REC 出力をオーディオインターフェースのライン入力につなぎ、その入力を **Input device** で選ぶのが確実です。
+レベルは、パネルのレベルメーターが目安の帯（-18〜-6 dBFS）に収まるように、ミキサー側やインターフェース側で合わせます。

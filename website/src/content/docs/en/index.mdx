@@ -1,0 +1,76 @@
+---
+title: Seedshade Documentation
+description: A usage guide for Seedshade, an audio-reactive VJ visual tool that runs entirely in the browser.
+template: splash
+hero:
+  tagline: Audio-reactive visuals in your browser where the shader itself is reassembled every time you draw a seed. No install; just open a URL and start VJing.
+  actions:
+    - text: Quick start
+      link: ./guide/quickstart/
+      icon: right-arrow
+      variant: primary
+    - text: Open the app
+      link: https://seedshade.tainakanchu.com
+      icon: external
+      variant: secondary
+    - text: View on GitHub
+      link: https://github.com/tainakanchu/seedshade
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard, Aside } from "@astrojs/starlight/components";
+
+## What is Seedshade
+
+**Seedshade** is a browser app that analyzes sound from a microphone, line input, or loopback (desktop audio) and draws full-screen visuals that react to the music.
+It is designed to sit in an OBS browser source, or in a full-screen browser connected to a projector.
+
+There is only one rendering engine: **Semantic Synth**. Instead of switching between pre-built visuals,
+it **assembles a GLSL shader from a seed (a string) every time** it draws.
+Each time you draw a new seed (look gacha), you get a completely different picture.
+
+<CardGrid stagger>
+  <Card title="Runs in the browser" icon="rocket">
+    Nothing to install. Open the URL in a WebGL2-capable browser. Audio analysis and rendering happen entirely in the browser, and your audio is never sent anywhere.
+  </Card>
+  <Card title="The seed decides the look" icon="random">
+    From 127 Generators, the seed determines the combination, parameters, and palette. The same seed always reproduces the same look.
+  </Card>
+  <Card title="Reacts to sound and tempo" icon="seti:audio">
+    The picture changes with bass, mids, treble, and volume. BPM is detected automatically, so glitches and zooms land on the beat. It almost freezes in silence.
+  </Card>
+  <Card title="A console for live shows" icon="setting">
+    From the separate Scene Deck window, trigger 8 variations with a key or MIDI (nanoPAD2 supported).
+  </Card>
+  <Card title="Overlay it in OBS as is" icon="laptop">
+    Make the background transparent and use it as an overlay in an OBS browser source.
+  </Card>
+  <Card title="Direct it with AI" icon="puzzle">
+    From the CLI you can schedule "switch to this look in N bars" or generate a Patch from mood words. A skill for Claude Code is included.
+  </Card>
+</CardGrid>
+
+## What you need
+
+| Item | Details |
+| --- | --- |
+| Browser | A desktop browser with **WebGL2** (Chrome / Edge recommended). Use Chrome / Edge for MIDI. |
+| Audio input | A microphone, an audio interface line input, or a **loopback** (a virtual device that captures the audio being played). To react to the music itself, loopback is recommended. |
+| GPU | Built so that the integrated GPU of a laptop can run 1080p routinely. When it gets heavy, the internal resolution drops automatically. |
+
+<Aside type="tip">
+  To just try it, open [https://seedshade.tainakanchu.com](https://seedshade.tainakanchu.com) and allow the microphone.
+  The steps are in the [Quick start](./guide/quickstart/).
+</Aside>
+
+## Where to read next
+
+<CardGrid>
+  <LinkCard title="Quick start" description="From opening the app to reacting to sound and drawing a seed." href="./guide/quickstart/" />
+  <LinkCard title="Screen & keys" description="Every control panel item and the shortcuts." href="./guide/screen/" />
+  <LinkCard title="Scene Deck" description="The separate console window for live shows. Trigger 8 slots, auto-advance." href="./live/scene-deck/" />
+  <LinkCard title="Venue setup checklist" description="What to check before the show." href="./live/checklist/" />
+  <LinkCard title="Hosted vs. local" description="What you can do in the public app, and what needs a local run." href="./reference/hosted-vs-local/" />
+  <LinkCard title="Troubleshooting" description="No audio response, a black screen, and more." href="./troubleshooting/" />
+</CardGrid>

@@ -1,0 +1,77 @@
+---
+title: Seedshade ドキュメント
+description: ブラウザだけで動く、音に反応する VJ ビジュアルツール Seedshade の使い方ガイド。
+template: splash
+hero:
+  tagline: シードを引くたびにシェーダそのものが組み替わる、ブラウザだけで動く音反応ビジュアル。インストール不要、URL を開くだけで VJ を始められます。
+  actions:
+    - text: クイックスタート
+      link: ./guide/quickstart/
+      icon: right-arrow
+      variant: primary
+    - text: アプリを開く
+      link: https://seedshade.tainakanchu.com
+      icon: external
+      variant: secondary
+    - text: GitHub で見る
+      link: https://github.com/tainakanchu/seedshade
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard, Aside } from "@astrojs/starlight/components";
+
+## Seedshade とは
+
+**Seedshade** は、マイク / ライン入力 / ループバック（デスクトップ音声）の音を解析して、
+音楽に反応するフルスクリーンのビジュアルを描くブラウザアプリです。
+OBS のブラウザソースや、プロジェクターにつないだフルスクリーンのブラウザに常駐させて使うことを想定しています。
+
+描画エンジンは **Semantic Synth** ひとつだけです。あらかじめ作り込んだ映像を切り替えるのではなく、
+**シード（文字列）から GLSL シェーダそのものを毎回組み立てて** 描きます。
+シードを引き直す（look gacha）たびに、まったく別の絵が出てきます。
+
+<CardGrid stagger>
+  <Card title="ブラウザだけで動く" icon="rocket">
+    インストール不要。WebGL2 が使えるブラウザで URL を開くだけです。音声解析も描画もすべてブラウザ内で完結し、音声はどこにも送信されません。
+  </Card>
+  <Card title="シードで見た目が決まる" icon="random">
+    127 種類の Generator から、シードに応じて組み合わせ・パラメータ・配色が決まります。同じシードなら必ず同じ見た目が再現できます。
+  </Card>
+  <Card title="音とテンポに反応" icon="seti:audio">
+    低域・中域・高域・音量で絵が変化し、BPM を自動検出して拍に合わせたグリッチやズームが入ります。無音ではほぼ止まります。
+  </Card>
+  <Card title="本番向けの操作卓" icon="setting">
+    別窓の Scene Deck から 8 面のバリエーションをキーや MIDI（nanoPAD2 対応）でポン出しできます。
+  </Card>
+  <Card title="OBS にそのまま重ねられる" icon="laptop">
+    背景を透過にすれば、OBS のブラウザソースでオーバーレイとして使えます。
+  </Card>
+  <Card title="AI と一緒に操縦" icon="puzzle">
+    CLI から「N 小節後にこの絵へ」と予約したり、ムード語から Patch を生成したりできます。Claude Code 用のスキルも同梱しています。
+  </Card>
+</CardGrid>
+
+## 必要なもの
+
+| もの | 内容 |
+| --- | --- |
+| ブラウザ | **WebGL2** が使えるデスクトップブラウザ（Chrome / Edge 推奨）。MIDI を使うなら Chrome / Edge。 |
+| 音声入力 | マイク、オーディオインターフェースのライン入力、または **ループバック**（再生中の音を入力として拾う仮想デバイス）。曲そのものに反応させたいならループバックがおすすめです。 |
+| GPU | ノート PC の内蔵 GPU で 1080p を常用できることを目標に作られています。重いときは内部解像度が自動で下がります。 |
+
+<Aside type="tip">
+  とりあえず触ってみるなら、[https://seedshade.tainakanchu.com](https://seedshade.tainakanchu.com) を開いてマイクを許可するだけです。
+  手順は [クイックスタート](./guide/quickstart/) にまとめています。
+</Aside>
+
+## どこから読むか
+
+<CardGrid>
+  <LinkCard title="クイックスタート" description="アプリを開いて、音に反応させて、シードを引くまで。" href="./guide/quickstart/" />
+  <LinkCard title="画面とキー操作" description="コントロールパネルの各項目とショートカット。" href="./guide/screen/" />
+  <LinkCard title="Scene Deck" description="本番で使う別窓の操作卓。8 面ポン出しと自動送り。" href="./live/scene-deck/" />
+  <LinkCard title="現場セットアップのチェックリスト" description="本番前に確認すること。" href="./live/checklist/" />
+  <LinkCard title="ホスト版とローカル版" description="公開中のアプリでできること / 手元で起動しないとできないこと。" href="./reference/hosted-vs-local/" />
+  <LinkCard title="トラブルシューティング" description="音に反応しない、真っ黒、など。" href="./troubleshooting/" />
+</CardGrid>

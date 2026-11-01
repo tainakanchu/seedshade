@@ -1,0 +1,118 @@
+---
+title: リモート操作と複数画面
+description: room（Cloudflare のリレー）や bridge（ローカル中継）で、別の PC や CLI から操作する。mirror で複数画面に出す。
+---
+
+import { Steps, Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+Seedshade の映像は、別の PC のターミナルや AI（CLI）から操作できます。
+メイン窓が中継サーバーに WebSocket でつながり、CLI（`vj-ctl` など）がその中継に命令を送るしくみです。
+
+| 中継 | 使う URL | 中継の場所 | 向いている場面 |
+| --- | --- | --- | --- |
+| **room** | `?room=<id>` | ホスト版の Worker（`/room/<id>`） | ホスト版を使うとき。別の PC・別のネットワークからでも操作できる |
+| **bridge** | `?bridge=1` | 自分の PC の `pnpm bridge`（`127.0.0.1:7877`） | ローカル版（`pnpm dev`）を使うとき。同じ PC の中だけ |
+
+URL に `room` も `bridge` も付けなければ、メイン窓は中継に一切つながりません（本番中に勝手に操作される心配がありません）。
+
+<Aside type="caution">
+  **ホスト版で `?bridge=1` は使えません。** ローカル中継（`pnpm bridge`）は、`localhost` / `127.0.0.1` 以外から開いたページの接続を拒否します。
+  ホスト版から操作したいときは `?room=` を使ってください。詳しくは [ホスト版とローカル版](../../reference/hosted-vs-local/)。
+</Aside>
+
+## room（ホスト版）で操作する
+
+CLI はリポジトリに入っているので、操作する側の PC にリポジトリを用意します（Node.js 24 と pnpm が必要です）。
+
+<Steps>
+
+1. **リポジトリを用意する**
+
+   ```bash
+   git clone https://github.com/tainakanchu/seedshade.git
+   cd seedshade
+   pnpm install
+   ```
+
+2. **room を作る**（通信はしません。ランダムな合鍵を作るだけです）
+
+   ```bash
+   node scripts/vj-ctl.mjs room --host seedshade.tainakanchu.com
+   ```
+
+   `room`（id）・`pageUrl`・`ctlArgs` が JSON で表示されます。
+
+   :::caution
+   `--host` は必ず付けてください。省略すると `seedshade.<account>.workers.dev` という仮のホスト名で URL が作られ、そのままでは使えません。
+   :::
+
+3. **出力用の PC で `pageUrl` を開く**
+
+   `https://seedshade.tainakanchu.com/?room=<id>` の形の URL です。`ui=hide` などほかのパラメータを足してもかまいません。
+
+4. **つながったか確認する**
+
+   ```bash
+   node scripts/vj-ctl.mjs --url wss://seedshade.tainakanchu.com/room/<id> state
+   ```
+
+   JSON が返れば準備完了です。以降のコマンドにはすべて同じ `--url` を付けます（`ctlArgs` をそのまま使えます）。
+
+</Steps>
+
+- `{"error":"no synth connected"}` … ページが開いていない、`?room=` が付いていない、room id が違う、のどれかです。
+- room id は **認証のない合鍵** です。URL を知っている人は誰でも映像を操作できるので、公開の場所に貼らず、本番ごとに作り直してください。
+- room id は 8〜64 文字の英数字・`_`・`-` です。形が違う id では接続しません。
+
+## bridge（ローカル版）で操作する
+
+<Steps>
+
+1. ローカル版を起動します（`pnpm dev`）。
+2. 別のターミナルで中継を起動して、動かしっぱなしにします。
+
+   ```bash
+   pnpm bridge
+   ```
+
+   `vj-bridge listening on ws://127.0.0.1:7877 ...` と出れば OK です。
+3. ブラウザで `https://localhost:5173/?bridge=1` を開きます。
+4. `node scripts/vj-ctl.mjs state` で確認します（ローカル中継が既定の接続先なので `--url` は要りません）。
+
+</Steps>
+
+- 中継は `127.0.0.1` だけで待ち受けます（認証がないので LAN には出しません）。そのため、**同じ PC の中** でしか使えません。
+- ポートを変えるときは `pnpm bridge --port 7878`、ページは `?bridge=7878`、CLI は `--port 7878` にそろえます。
+- `vj:gen` / `vj:tweak` / `vj:recipe` は接続先の指定が必須なので、`--url ws://127.0.0.1:7877` を付けます（[しくみと接続](../../ai/overview/)）。
+
+## mirror：複数の画面に出す
+
+同じ room（または bridge）に、表示専用の **mirror** として何台でもつなげられます。
+
+| 役割 | URL | 台数 |
+| --- | --- | --- |
+| メイン（命令に応答する） | `?room=<id>` | **1 台だけ** |
+| mirror（表示専用） | `?room=<id>&mirror=1` | 何台でも |
+
+CLI から送った命令は、メインと全 mirror に同時に届きます。mirror は応答を返さないので、`state` などの問い合わせにはメインが答えます。
+
+<Aside type="caution" title="mirror は「CLI の命令」だけをそろえます">
+  mirror に届くのは CLI（中継）からの命令だけです。次のものは **各画面で別々** なので、画面ごとに絵がずれることがあります。
+
+  - メイン窓のキー操作・パネル操作（`R` / `D`、シード入力、Auto-gacha など）
+  - Scene Deck のポン出し（Deck は同じブラウザ内のメイン窓にしか届きません）
+  - 音声入力（それぞれの画面が自分の入力で反応します）
+  - 開いた時点のシード（各ブラウザに保存されている設定）
+
+  複数画面で同じ絵を保ちたいときは、操作を CLI に寄せ、各画面を同じ `?seed=` で開いてください。
+</Aside>
+
+<Aside type="danger" title="メインを 2 つ開かない">
+  `mirror=1` を付けずに同じ room を 2 つ開くと、新しい方がメインになり、古い方は切断されます。
+  古い方は 3 秒ごとに自動で再接続するので、2 つのメインが交互に入れ替わり続けることになります。メイン以外には必ず `mirror=1` を付けてください。
+</Aside>
+
+## LAN の別端末からローカル版を開く
+
+`pnpm dev` は LAN にも公開されるので、同じネットワークの別の端末から `https://<PC の IP アドレス>:5173/` で開けます（自己署名証明書の警告は「詳細設定」→「アクセスする」で進みます）。
+ただし、その端末からは `?bridge=1` は使えません（bridge はその端末自身の `127.0.0.1` を見に行くため）。別の端末から操作したいときは、ホスト版と `?room=` を使ってください。

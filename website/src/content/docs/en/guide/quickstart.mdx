@@ -1,0 +1,98 @@
+---
+title: Quick start
+description: The shortest path from opening the app and allowing the microphone to reacting to sound and drawing a seed.
+---
+
+import { Steps, Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+The fastest way is to open the public app (the hosted version). No installation is needed.
+
+<Steps>
+
+1. **Open the app**
+
+   Open [https://seedshade.tainakanchu.com](https://seedshade.tainakanchu.com) in Chrome or Edge.
+   A control panel labeled `SEEDSHADE` appears at the top left, and a `Timeline` panel at the top right.
+
+   If you see "WebGL2 が必要です" ("WebGL2 is required"), this browser or PC cannot render Seedshade.
+   See [Troubleshooting](../../troubleshooting/#webgl2-is-required-error).
+
+2. **Allow the microphone (audio input)**
+
+   Right after the page opens, the browser asks for permission to use audio input. Choose **Allow**.
+
+   If it does not react after you allow it, or no dialog appears, click the **▶ Click to start audio** button at the top of the panel once.
+   When the indicator at the top right of the panel changes from `idle` to `live` and the button becomes **■ Stop audio**, audio input is running.
+
+3. **Choose an input device**
+
+   Use **Input device** in the panel to choose the input (default: `System default`).
+   Device names appear after you grant permission. If you switch while running, it re-captures from the new device right away.
+
+   To react to the music itself rather than the microphone, choose a **loopback** (a virtual device that captures the audio being played).
+   For setup, see [OBS, transparency & desktop audio](../../live/obs/#reacting-to-desktop-audio).
+
+4. **Set the level**
+
+   Play some sound and check that the panel's level meter and the `B` `M` `T` (bass, mids, treble) bars move.
+   The level meter shows the size of the **raw input (before Gain)** in dBFS.
+   Aim for the bright band on the meter (-18 to -6 dBFS).
+
+   - Nothing moves and `NO SIGNAL` appears (shown after about 3 seconds below roughly -60 dBFS) → the input device is wrong, or no sound is arriving.
+   - `CLIP` lights up → the input is saturated. Turn down the volume on the playback side or the audio interface (lowering Gain will not clear it).
+   - The visuals react too weakly or too strongly → adjust the **Gain** slider (0.5 to 4x, default 1.5x).
+     Gain only affects the signal used for analysis, so the `B` `M` `T` bars change but the level meter does not.
+
+5. **Draw a seed (look gacha)**
+
+   Press the 🎲 button on the **Look** row of the panel, or the **`R`** key.
+   A random seed such as `neon-tiger-042` is generated, and the picture crossfades to a completely different look.
+   When you get a look you like, note down the displayed seed string so you can reproduce it later.
+
+6. **Go full screen and hide the panels**
+
+   **`F`** toggles full screen, and **`H`** hides the panels (both the control panel and the Timeline panel).
+   Press `H` again to bring them back.
+
+</Steps>
+
+<Aside type="tip" title="Once you have this working">
+  - To keep the same "shape" and change only colors and details, use the 🧬 button / **`D`** ([Seeds](../seed/))
+  - To redraw the seed automatically in time with the music, use **🎲 Auto-gacha** ([Tempo sync](../tempo/))
+  - To trigger 8 variations live, press **`S`** to open the [Scene Deck](../../live/scene-deck/)
+</Aside>
+
+## Settings are saved automatically
+
+Gain, Hue, background, Auto-gacha, input device, and seed are saved automatically in the browser (`localStorage`) and are restored the next time you open it.
+You can also set the startup configuration with URL parameters ([URL parameters](../../reference/url-params/)).
+
+<Aside type="note">
+  Storage is separate for each browser and origin (URL domain). Settings are not shared between the hosted version and a local version running on `localhost`.
+</Aside>
+
+## Running it locally
+
+If you want to try code in development, or use the local relay (`pnpm bridge`), clone the repository and start it.
+
+<Tabs>
+<TabItem label="Run locally">
+
+```bash
+git clone https://github.com/tainakanchu/seedshade.git
+cd seedshade
+pnpm install
+pnpm dev
+```
+
+Open the URL that is printed (usually `https://localhost:5173/`). The dev server runs over **HTTPS** with a self-signed certificate,
+so the browser shows a warning the first time. Proceed via "Advanced" → "Proceed to ...".
+
+</TabItem>
+<TabItem label="Differences from the hosted version">
+
+Rendering, panels, Timeline, Scene Deck, and MIDI work the same in both.
+The difference is how you connect when controlling from the CLI / AI. See [Hosted vs. local](../../reference/hosted-vs-local/) for details.
+
+</TabItem>
+</Tabs>

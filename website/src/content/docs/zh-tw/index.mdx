@@ -1,0 +1,77 @@
+---
+title: Seedshade 文件
+description: 純瀏覽器運行、會隨音樂反應的 VJ 視覺工具 Seedshade 的使用指南。
+template: splash
+hero:
+  tagline: 每抽一次種子，著色器本身就會重新組合。純瀏覽器運行的音訊反應視覺，免安裝，開啟網址就能開始 VJ。
+  actions:
+    - text: 快速開始
+      link: ./guide/quickstart/
+      icon: right-arrow
+      variant: primary
+    - text: 開啟應用程式
+      link: https://seedshade.tainakanchu.com
+      icon: external
+      variant: secondary
+    - text: 在 GitHub 上查看
+      link: https://github.com/tainakanchu/seedshade
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard, Aside } from "@astrojs/starlight/components";
+
+## 什麼是 Seedshade
+
+**Seedshade** 是一款瀏覽器應用程式，會分析麥克風 / 線路輸入 / 回送（桌面音訊）的聲音，
+繪製出隨音樂反應的全螢幕視覺。
+設計上是讓它常駐在 OBS 的瀏覽器來源，或是接上投影機的全螢幕瀏覽器中使用。
+
+繪圖引擎只有 **Semantic Synth** 一個。它不是在事先做好的畫面之間切換，
+而是**每次都從種子（字串）組裝出 GLSL 著色器本身**再繪製。
+每次重抽種子（look gacha），就會出現完全不同的畫面。
+
+<CardGrid stagger>
+  <Card title="純瀏覽器運行" icon="rocket">
+    免安裝。只要用支援 WebGL2 的瀏覽器開啟網址即可。音訊分析與繪圖全部在瀏覽器內完成，聲音不會傳送到任何地方。
+  </Card>
+  <Card title="種子決定外觀" icon="random">
+    從 127 種 Generator 中，依種子決定組合、參數與配色。相同的種子一定能重現相同的外觀。
+  </Card>
+  <Card title="隨聲音與節拍反應" icon="seti:audio">
+    畫面會隨低頻、中頻、高頻與音量變化，並自動偵測 BPM，在拍點上加入故障特效與縮放。無聲時幾乎靜止。
+  </Card>
+  <Card title="現場用的操作台" icon="setting">
+    從另開視窗的 Scene Deck，可用按鍵或 MIDI（支援 nanoPAD2）一鍵切換 8 個變化版本。
+  </Card>
+  <Card title="可直接疊在 OBS 上" icon="laptop">
+    將背景設為透明，就能在 OBS 的瀏覽器來源中當作疊加層使用。
+  </Card>
+  <Card title="與 AI 一起操控" icon="puzzle">
+    可從 CLI 預約「N 小節後切換到這個畫面」，或依情緒關鍵字生成 Patch。也附有 Claude Code 用的技能。
+  </Card>
+</CardGrid>
+
+## 需要準備的東西
+
+| 項目 | 說明 |
+| --- | --- |
+| 瀏覽器 | 支援 **WebGL2** 的桌面瀏覽器（建議使用 Chrome / Edge）。要使用 MIDI 則需要 Chrome / Edge。 |
+| 音訊輸入 | 麥克風、音訊介面的線路輸入，或**回送**（把正在播放的聲音當作輸入擷取的虛擬裝置）。想讓畫面直接對歌曲反應的話，建議使用回送。 |
+| GPU | 設計目標是讓筆電的內建 GPU 也能常態以 1080p 運行。負載過重時，內部解析度會自動降低。 |
+
+<Aside type="tip">
+  想先試試看的話，只要開啟 [https://seedshade.tainakanchu.com](https://seedshade.tainakanchu.com) 並允許使用麥克風即可。
+  步驟整理在[快速開始](./guide/quickstart/)。
+</Aside>
+
+## 從哪裡開始讀
+
+<CardGrid>
+  <LinkCard title="快速開始" description="從開啟應用程式、讓畫面隨聲音反應，到抽種子為止。" href="./guide/quickstart/" />
+  <LinkCard title="畫面與按鍵操作" description="控制面板的各個項目與快捷鍵。" href="./guide/screen/" />
+  <LinkCard title="Scene Deck" description="現場使用的另開視窗操作台。8 格一鍵切換與自動換場。" href="./live/scene-deck/" />
+  <LinkCard title="現場設定檢查清單" description="正式演出前要確認的事項。" href="./live/checklist/" />
+  <LinkCard title="線上版與本機版" description="公開版應用程式能做的事 / 必須在自己電腦上啟動才能做的事。" href="./reference/hosted-vs-local/" />
+  <LinkCard title="疑難排解" description="沒有隨聲音反應、畫面全黑等問題。" href="./troubleshooting/" />
+</CardGrid>

@@ -1,0 +1,83 @@
+---
+title: OBS, transparency & desktop audio
+description: How to use Seedshade as a transparent overlay in an OBS browser source, and how to make it react to the music you are playing.
+---
+
+import { Steps, Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+## Using it in an OBS browser source
+
+<Steps>
+
+1. In OBS, choose **Sources → Add → Browser**.
+2. Enter the Seedshade address in **URL**. For use as an overlay, a transparent background and hidden panels are convenient.
+
+   ```
+   https://seedshade.tainakanchu.com/?bg=transparent&ui=hide
+   ```
+
+   To lock the look, add `&seed=<seed>`; to set reaction strength, add something like `&gain=2` ([URL parameters](../../reference/url-params/)).
+3. Set **Width / Height** to your output resolution (for example 1920 × 1080).
+4. With `bg=transparent` the background stays transparent, so you can layer it over other sources.
+
+</Steps>
+
+<Aside type="caution" title="A browser source may not pick up audio">
+  Seedshade analyzes sound inside the page using `getUserMedia` (the browser's audio input). It is unrelated to OBS's "Control audio via OBS".
+  The OBS browser source does not show the microphone permission dialog like a normal browser, so depending on your environment audio input may not be available and the visuals will not react to sound.
+
+  In that case, do one of the following.
+
+  - **Open Seedshade in a normal browser and capture it with an OBS "Window Capture"** (transparency is not available, so layer it with the black background using a "Chroma Key" or "Blend: Add / Screen").
+  - Enable media permission for the browser source via OBS launch options or similar (this is an OBS-side setting, not a Seedshade feature, and behavior depends on your OBS version and OS).
+</Aside>
+
+<Aside type="tip">
+  If you need to press **▶ Click to start audio** in the browser source, right-click the source in OBS → **Interact** to operate the panel (with `?ui=hide`, press `H` in the interaction window to show the panel).
+</Aside>
+
+## About the transparent background
+
+- Switch the background with `Black` / `Transparent` under **Background**, the **`B`** key, or `?bg=transparent` in the URL.
+- When transparent, the rendered output keeps its alpha. Parts where nothing is drawn show through.
+- Depending on the Patch, the generated picture is either "something that fills the screen" or "something with a lot of empty space". For overlay use, it helps to note down seeds that produced pictures with lots of empty space.
+
+## Reacting to desktop audio
+
+By itself, the browser's audio input picks up only the microphone. To react to the music playing on the PC or a DAW's output, create a **loopback (virtual audio device)** and choose it as Seedshade's **Input device**.
+
+<Tabs>
+<TabItem label="Windows">
+
+Install a virtual audio device such as [VB-CABLE](https://vb-audio.com/Cable/).
+
+1. Set the output of the app that makes sound (or Windows' default playback device) to **CABLE Input**.
+2. Choose **CABLE Output** as Seedshade's **Input device**.
+3. If you also want to hear it yourself, route it to your speakers too, for example with "Listen to this device" on CABLE Output in Windows sound settings.
+
+</TabItem>
+<TabItem label="macOS">
+
+Install something like [BlackHole](https://existential.audio/blackhole/) or Loopback.
+
+1. In "Audio MIDI Setup", create a "Multi-Output Device" combining your speakers and BlackHole, and use it for playback.
+2. Choose **BlackHole** as Seedshade's **Input device**.
+
+</TabItem>
+<TabItem label="Linux">
+
+With PulseAudio / PipeWire, an output device's **Monitor** (for example `Monitor of ...`) appears as an input.
+Choose it as Seedshade's **Input device** to capture desktop audio.
+
+</TabItem>
+</Tabs>
+
+<Aside type="note">
+  Seedshade captures audio with echo cancellation, noise suppression, and auto gain all turned off. Line-in sound is analyzed as is.
+  The input device list is shown with device names once you have granted audio input permission. The list updates automatically when you plug or unplug a device.
+</Aside>
+
+## Using a DJ mixer's audio
+
+At a venue, the reliable approach is to connect the DJ mixer's booth output or REC output to an audio interface's line input, and choose that input as **Input device**.
+Set the level on the mixer or interface so that the panel's level meter stays within the target band (-18 to -6 dBFS).

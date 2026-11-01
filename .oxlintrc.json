@@ -18,5 +18,6 @@
     "typescript/no-misused-promises": "error",
     "typescript/await-thenable": "error"
   },
-  "ignorePatterns": ["dist", "node_modules"]
+  // website/ (Astro ドキュメント) は独自の依存とビルドを持つので対象外。
+  "ignorePatterns": ["dist", "node_modules", "website"]
 }
