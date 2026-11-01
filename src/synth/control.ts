@@ -1,5 +1,3 @@
-import type { BlendMode } from '../ui/blend';
-import { resolveBlendMode } from '../ui/blend';
 import type { PerformanceTimeline, TimelineOp } from './timeline';
 import type { VisualPatch } from './types';
 
@@ -18,8 +16,7 @@ import type { VisualPatch } from './types';
  * deliberately transport-agnostic.
  *
  * The registry owns no synth state of its own: it is a backend slot plus a
- * listener set, plus a few facade-owned fields (e.g. blendMode) that are not
- * scene-specific. With no scene registered every backend call is a safe no-op,
+ * listener set. With no scene registered every backend call is a safe no-op,
  * so callers never have to check whether a synth scene happens to be on screen.
  */
 
@@ -47,24 +44,10 @@ export interface SynthControlState {
    */
   reactions: readonly string[];
   /**
-   * オーバーレイ合成のブレンドモード（常に存在する。既定 `'normal'`）。
-   *
-   * シーン backend ではなく facade が所有する。CLI / Bridge から切り替え可能で、
-   * オーバーレイが無いときは描画側が無視する。
-   */
-  blendMode: BlendMode;
-  /**
    * レンダラの現在 hue（0..360、variation.hueOffset 込み）。
    * シーン非アクティブ時は 0。
    */
   hue: number;
-}
-
-/** setBlendMode の結果。不正値でも ok:true（normal へフォールバック + warning）。 */
-export interface SetBlendModeResult {
-  ok: true;
-  mode: BlendMode;
-  warning?: string;
 }
 
 /** setImage の結果。ok のとき hash は Patch の images 参照にそのまま使える。 */
@@ -98,34 +81,20 @@ export interface SynthControl {
   stopRecording(): string | null;
   /** replay 用に Timeline を再構成して適用する。 */
   loadRecording(json: string): { ok: boolean; issues: string[] };
-  /**
-   * オーバーレイ合成のブレンドモードを設定する（facade 専用。backend は持たない）。
-   *
-   * 不正値は `normal` にフォールバックし warning を返す。常に ok:true。
-   */
-  setBlendMode(mode: string): SetBlendModeResult;
   /** 状態変化の購読（UI 再描画用）。unsubscribe を返す。 */
   subscribe(listener: () => void): () => void;
 }
 
-/**
- * シーンが登録する実体。subscribe と setBlendMode はレジストリ（facade）側が持つ。
- * getState は blendMode を省略してよい（facade が上書きする）。
- */
-export type SynthControlBackend = Omit<SynthControl, 'subscribe' | 'setBlendMode' | 'getState'> & {
-  getState(): Omit<SynthControlState, 'blendMode'>;
-};
+/** シーンが登録する実体。subscribe はレジストリ（facade）側が持つ。 */
+export type SynthControlBackend = Omit<SynthControl, 'subscribe'>;
 
 const NO_SCENE = 'no synth scene is active';
 
 let active: SynthControlBackend | null = null;
 const listeners = new Set<() => void>();
 
-/** Facade-owned blend mode (not scene-specific). */
-let blendMode: BlendMode = 'normal';
-
-/** What the facade reports while nothing is registered (blendMode merged on read). */
-function idleState(): Omit<SynthControlState, 'blendMode'> {
+/** What the facade reports while nothing is registered. */
+function idleState(): SynthControlState {
   return {
     currentPatch: null,
     timeline: { lockedUntilSec: 0, events: [] },
@@ -173,9 +142,7 @@ export function notifySynthControlChanged(): void {
  */
 const facade: SynthControl = {
   getState(): SynthControlState {
-    // blendMode is facade-owned; always overwrite whatever a backend might put.
-    const base = active ? active.getState() : idleState();
-    return { ...base, blendMode };
+    return active ? active.getState() : idleState();
   },
 
   proposePatch(input: unknown): { ok: boolean; issues: string[] } {
@@ -210,13 +177,6 @@ const facade: SynthControl = {
 
   loadRecording(json: string): { ok: boolean; issues: string[] } {
     return active ? active.loadRecording(json) : { ok: false, issues: [NO_SCENE] };
-  },
-
-  setBlendMode(mode: string): SetBlendModeResult {
-    const { mode: resolved, warning } = resolveBlendMode(mode);
-    blendMode = resolved;
-    notifySynthControlChanged();
-    return warning != null ? { ok: true, mode: resolved, warning } : { ok: true, mode: resolved };
   },
 
   subscribe(listener: () => void): () => void {

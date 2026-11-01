@@ -13,10 +13,11 @@
  */
 import { chromium, type Browser, type Page } from 'playwright';
 import { FULLSCREEN_VERT } from '../../render/glutil';
+import { AUDIO_TEXTURE_WIDTH, headlessAudioTexels } from '../audioTextures';
 import { inlineCatalog } from '../generators';
 import { namespaceToU32, seedToU32 } from '../rng';
 import type { GeneratorDefinition, VisualOperator, VisualPatch } from '../types';
-import { assemblePatch, SEED_UNIFORM, type AssembledShader } from './assemble';
+import { assemblePatch, audioTextureUnit, SEED_UNIFORM, type AssembledShader } from './assemble';
 
 interface GpuEnv {
   CHROMIUM_BIN?: string;
@@ -150,6 +151,37 @@ export interface TextureSpec {
   sizeName: string;
   unit: number;
   kind: 'pattern' | 'transparent' | 'firstRows';
+}
+
+/**
+ * A per-frame audio texture to bind before drawing (see ../audioTextures).
+ * `texels` is a plain array so it crosses the CDP boundary as JSON.
+ */
+export interface AudioTextureSpec {
+  name: string;
+  unit: number;
+  width: number;
+  texels: number[];
+}
+
+/**
+ * What the headless audio textures carry. `synthetic` (default) is the fixed
+ * signal from ../audioTextures — the texture-side twin of the "every audio
+ * uniform = 0.5" frame below. `idle` is what the app shows with audio stopped.
+ */
+export type AudioSignal = 'synthetic' | 'idle';
+
+/** Bindings for every audio texture the patch reads, filled with `signal`. */
+export function audioTextureSpecs(
+  assembled: AssembledShader,
+  signal: AudioSignal = 'synthetic',
+): AudioTextureSpec[] {
+  return assembled.audioTextures.map((a, i) => ({
+    name: a.name,
+    unit: audioTextureUnit(assembled, i),
+    width: AUDIO_TEXTURE_WIDTH[a.kind],
+    texels: Array.from(headlessAudioTexels(a.kind, signal)),
+  }));
 }
 
 /** Size of the procedural test image. Large enough to survive the 96px pass. */
@@ -316,10 +348,22 @@ async function runInBrowser(
     times: number[] | null;
     timeUniform: string;
     mode?: 'stats' | 'png';
+    audio?: AudioTextureSpec[];
   },
 ): Promise<RunStatsResult | RunPngResult> {
   return page.evaluate(
-    ({ vertSrc, fragSrc, uniforms, size, textures, imageSize, times, timeUniform, mode }) => {
+    ({
+      vertSrc,
+      fragSrc,
+      uniforms,
+      size,
+      textures,
+      imageSize,
+      times,
+      timeUniform,
+      mode,
+      audio,
+    }) => {
       const canvas = document.createElement('canvas');
       canvas.width = size;
       canvas.height = size;
@@ -501,6 +545,33 @@ async function runInBrowser(
         const px = t.kind === 'transparent' ? 1 : imageSize;
         if (sizeLoc) gl.uniform2f(sizeLoc, px, px);
       }
+      // Per-frame audio textures: Nx1 RGBA8, LINEAR + CLAMP — the same setup
+      // as synth/gl/audioTextureGl.ts in the app.
+      for (const a of audio) {
+        const audioTex = gl.createTexture();
+        if (!audioTex) continue;
+        createdTextures.push(audioTex);
+        gl.activeTexture(gl.TEXTURE0 + a.unit);
+        gl.bindTexture(gl.TEXTURE_2D, audioTex);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA8,
+          a.width,
+          1,
+          0,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          new Uint8Array(a.texels),
+        );
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        const loc = gl.getUniformLocation(prog, a.name);
+        if (loc) gl.uniform1i(loc, a.unit);
+      }
       gl.activeTexture(gl.TEXTURE0);
 
       for (const u of uniforms) {
@@ -642,6 +713,7 @@ async function runInBrowser(
       times: spec.times,
       timeUniform: spec.timeUniform,
       mode: spec.mode ?? 'stats',
+      audio: spec.audio ?? [],
     },
   );
 }
@@ -658,6 +730,7 @@ export async function renderInBrowser(
   size: number,
   textures: TextureSpec[] = [],
   imageSize: number = DUMMY_IMAGE_SIZE,
+  audio: AudioTextureSpec[] = [],
 ): Promise<FrameResult> {
   const res = await runInBrowser(page, {
     vertSrc,
@@ -669,6 +742,7 @@ export async function renderInBrowser(
     times: null,
     timeUniform: TIME_UNIFORM,
     mode: 'stats',
+    audio,
   });
   if (!res.ok) return res;
   if (!('frames' in res)) return { ok: false, log: 'expected stats result' };
@@ -690,6 +764,7 @@ export async function measureFramesInBrowser(
   times: number[],
   textures: TextureSpec[] = [],
   imageSize: number = DUMMY_IMAGE_SIZE,
+  audio: AudioTextureSpec[] = [],
 ): Promise<FramesResult> {
   const res = await runInBrowser(page, {
     vertSrc,
@@ -701,6 +776,7 @@ export async function measureFramesInBrowser(
     times,
     timeUniform: TIME_UNIFORM,
     mode: 'stats',
+    audio,
   });
   if (!res.ok) return res;
   if (!('frames' in res)) return { ok: false, log: 'expected stats result' };
@@ -722,6 +798,7 @@ export async function capturePatchPngs(
   size: number,
   times: number[],
   textureKind: TextureSpec['kind'] = 'pattern',
+  audioSignal: AudioSignal = 'synthetic',
 ): Promise<RunPngResult> {
   const built = assemble(patch);
   if (!built.ok) return built;
@@ -739,6 +816,7 @@ export async function capturePatchPngs(
       times,
       timeUniform: TIME_UNIFORM,
       mode: 'png',
+      audio: audioTextureSpecs(assembled, audioSignal),
     });
     if (!res.ok) return res;
     if (!('pngs' in res)) return { ok: false, log: 'expected png result' };
@@ -783,6 +861,7 @@ export async function renderPatchFrame(
   size: number,
   textureKind: TextureSpec['kind'] = 'pattern',
   time: number = DEFAULT_UNIFORM_TIME,
+  audioSignal: AudioSignal = 'synthetic',
 ): Promise<FrameResult> {
   const built = assemble(patch);
   if (!built.ok) return built;
@@ -797,6 +876,8 @@ export async function renderPatchFrame(
       uniforms,
       size,
       textures,
+      DUMMY_IMAGE_SIZE,
+      audioTextureSpecs(assembled, audioSignal),
     );
   } catch (e) {
     return {
@@ -813,6 +894,7 @@ export async function measurePatchFrames(
   size: number,
   times: number[],
   textureKind: TextureSpec['kind'] = 'pattern',
+  audioSignal: AudioSignal = 'synthetic',
 ): Promise<FramesResult> {
   const built = assemble(patch);
   if (!built.ok) return built;
@@ -828,6 +910,8 @@ export async function measurePatchFrames(
       size,
       times,
       textures,
+      DUMMY_IMAGE_SIZE,
+      audioTextureSpecs(assembled, audioSignal),
     );
   } catch (e) {
     return {

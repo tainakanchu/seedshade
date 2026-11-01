@@ -6,9 +6,11 @@
 // 実際に今回見つかったバグ: vj-gen.mjs の AUDIO_SOURCES が audio:beatIntensity /
 // audio:gridPulse / audio:barPulse を欠いていて、audio:beatIntensity を使う
 // パッチ（今回の安全対応そのもの）がローカル検証で弾かれていた。
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as derive from '../src/synth/derive.ts';
 import * as schema from '../src/synth/schema.ts';
+import { allGeneratorDefinitions } from '../src/synth/generators/index.ts';
 import * as validate from '../src/synth/validate.ts';
 import * as vjGen from './vj-gen.mjs';
 import * as vjTweak from './vj-tweak.mjs';
@@ -87,5 +89,52 @@ describe('constants drift: vj-tweak.mjs vs src/synth/*.ts', () => {
     expect(sortedArray(vjTweak.COMPOSITION_KEYS)).toEqual(
       sortedArray(Object.keys(schema.compositionSpecSchema.entries)),
     );
+  });
+});
+
+// vj-vocab.json は語 → タグで Generator を引く。カタログ側にそのタグを持つ Generator が
+// 1 つも無いと、その語は（警告も無く）何も引けない死に語になる。Generator のタグを
+// 書き換えたり語を足したりしたときに気付けるよう、語彙とカタログのタグ集合を突き合わせる。
+describe('constants drift: vj-vocab.json vs generator catalog tags', () => {
+  const vocab = JSON.parse(readFileSync(`${import.meta.dirname}/vj-vocab.json`, 'utf8'));
+  const catalogTags = {};
+  for (const def of allGeneratorDefinitions()) {
+    for (const [axis, values] of Object.entries(def.tags)) {
+      for (const v of values ?? []) (catalogTags[axis] ??= new Set()).add(v);
+    }
+  }
+
+  it('every vocab tag is carried by at least one generator', () => {
+    const dead = [];
+    for (const [word, entry] of Object.entries(vocab)) {
+      for (const [axis, values] of Object.entries(entry.tags ?? {})) {
+        for (const v of values) if (!catalogTags[axis]?.has(v)) dead.push(`${word}: ${axis}.${v}`);
+      }
+    }
+    expect(dead).toEqual([]);
+  });
+
+  it('the legacy-scene words reach their ported generators', () => {
+    const expectations = {
+      スペクトラム: ['spectrumBars', 'spectrumRadial'],
+      オシロ: ['oscilloscope', 'lissajousScope'],
+      リサージュ: ['lissajousScope'],
+      オーロラ: ['auroraCurtain'],
+      煙: ['smokeFog'],
+      パーティクル: ['particleField'],
+      リング: ['beatRings'],
+      マーブル: ['inkMarble'],
+    };
+    const defs = new Map(allGeneratorDefinitions().map((d) => [d.id, d]));
+    for (const [word, ids] of Object.entries(expectations)) {
+      const material = new Set(vocab[word]?.tags?.material ?? []);
+      for (const id of ids) {
+        const genMaterial = defs.get(id)?.tags.material ?? [];
+        expect(
+          genMaterial.some((m) => material.has(m)),
+          `${word} should share a material tag with ${id}`,
+        ).toBe(true);
+      }
+    }
   });
 });

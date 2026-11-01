@@ -4,15 +4,13 @@ import { initDeckHost, type DeckHostHandlers } from './deck/host';
 import { openSceneDeck } from './deck/openDeck';
 import type { DeckAppState, DeckCommand } from './deck/protocol';
 import { Renderer } from './render/Renderer';
-import { scenes, sceneByIndex, sceneIndexById } from './scenes';
+import { defaultScene } from './scenes';
 import { initBridgeClient } from './synth/bridgeClient';
 import { getSynthControl } from './synth/control';
 import { rerollPatch } from './synth/derive';
 import { inlineCatalog } from './synth/generators';
 import { serializePatch } from './synth/schema';
-import { resolveBlendMode } from './ui/blend';
 import { ControlPanel } from './ui/ControlPanel';
-import { resolveOverlaySceneId } from './ui/overlay';
 import { TimelinePanel } from './ui/TimelinePanel';
 import { sanitizeSettings, useSettings, type Settings } from './ui/useSettings';
 import { generateVariation, randomSeed } from './variation/generate';
@@ -39,16 +37,15 @@ async function toggleFullscreen(): Promise<void> {
 }
 
 export function App(): React.ReactElement {
-  const { settings, update, initialUiHidden, initialOverlayRaw, initialBlendRaw } = useSettings();
+  const { settings, update, initialUiHidden } = useSettings();
 
   const variation = useMemo(() => generateVariation(settings.seed), [settings.seed]);
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const glCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<AudioEngine | null>(null);
   const rendererRef = useRef<Renderer | null>(null);
 
-  // Whether WebGL2 is usable; gates the GL scenes in the UI.
+  // Whether WebGL2 is usable. Seedshade requires it; false shows an explicit message.
   const [glAvailable, setGlAvailable] = useState(true);
 
   // Latest settings, readable from the rAF/engine callbacks without re-binding.
@@ -76,14 +73,6 @@ export function App(): React.ReactElement {
   const variationRef = useRef(variation);
   variationRef.current = variation;
 
-  // initialOverlayRaw / initialBlendRaw are stable (read once inside useSettings
-  // from the URL at mount); kept in refs so the mount effect below can read
-  // them without joining the dependency array.
-  const initialOverlayRawRef = useRef(initialOverlayRaw);
-  initialOverlayRawRef.current = initialOverlayRaw;
-  const initialBlendRawRef = useRef(initialBlendRaw);
-  initialBlendRawRef.current = initialBlendRaw;
-
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -94,59 +83,19 @@ export function App(): React.ReactElement {
 
   // ---- Engine + Renderer lifecycle (once) ----
   useEffect(() => {
-    const canvas = canvasRef.current;
     const glCanvas = glCanvasRef.current;
-    if (!canvas || !glCanvas) return;
+    if (!glCanvas) return;
 
     const engine = new AudioEngine();
     const renderer = new Renderer({
-      canvas,
       glCanvas,
+      scene: defaultScene,
       engine,
       getGain: () => settingsRef.current.gain,
       getFixedHue: () =>
         settingsRef.current.hueMode === 'fixed' ? settingsRef.current.fixedHue : null,
       variation: variationRef.current,
     });
-    renderer.setScenes(scenes);
-    if (!renderer.setScene(settingsRef.current.sceneId)) {
-      // 既定シーン（semantic-synth）は GL なので、WebGL2 が無い環境では開けない。
-      // setScenes が代わりに選んだ描けるシーンへ設定を寄せて、真っ黒な画面に
-      // ならないようにする。
-      const active = renderer.activeSceneId;
-      if (active) update({ sceneId: active });
-    }
-
-    // renderer.activeSceneId を使うのは意図的（settingsRef.current.sceneId で
-    // はない）: 上の WebGL2 フォールバックで実際に開いたシーンが基準でないと、
-    // ベースシーンとの一致判定（オーバーレイ自己参照の警告）がずれてしまう。
-    const { id: overlayId, warning } = resolveOverlaySceneId(
-      initialOverlayRawRef.current,
-      renderer.activeSceneId ?? '',
-      scenes.map((s) => s.id),
-    );
-    if (warning) {
-      console.warn(`[seedshade] ${warning}`);
-    } else if (overlayId && !renderer.setOverlayScene(overlayId)) {
-      console.warn(
-        `[seedshade] overlay "${overlayId}" を有効化できませんでした（WebGL2 非対応の可能性）。通常描画にフォールバックします。`,
-      );
-    }
-
-    // blend も URL 専用。不正値は normal に倒し、コンソールへ警告するだけ。
-    // control と renderer の両方に載せ、CLI からの setBlendMode は subscribe で追従。
-    const { mode: blendMode, warning: blendWarning } = resolveBlendMode(initialBlendRawRef.current);
-    if (blendWarning) {
-      console.warn(`[vj-blend] ${blendWarning}`);
-    }
-    renderer.setBlendMode(blendMode);
-    getSynthControl().setBlendMode(blendMode);
-
-    const unsubBlend = getSynthControl().subscribe(() => {
-      // Idempotent: frequent notifies (patch/timeline) are fine.
-      renderer.setBlendMode(getSynthControl().getState().blendMode);
-    });
-
     renderer.start();
 
     engineRef.current = engine;
@@ -154,14 +103,12 @@ export function App(): React.ReactElement {
     setGlAvailable(renderer.glAvailable);
 
     return () => {
-      unsubBlend();
       renderer.dispose();
       engine.stop();
       engineRef.current = null;
       rendererRef.current = null;
     };
-    // update は useSettings が返す安定参照。マウント時に一度だけ走らせる。
-  }, [update]);
+  }, []);
 
   // ---- Audio control ----
   const refreshDevices = useCallback(async () => {
@@ -239,34 +186,6 @@ export function App(): React.ReactElement {
     };
   }, [refreshDevices]);
 
-  // ---- Scene selection ----
-  const setScene = useCallback(
-    (id: string) => {
-      // 開けなかったシーン（WebGL2 非対応環境の GL シーン）は設定にも残さない。
-      // 残すと「選ばれているのに描かれない」状態になる。
-      if (rendererRef.current && !rendererRef.current.setScene(id)) return;
-      applyUpdate({ sceneId: id });
-    },
-    [applyUpdate],
-  );
-
-  const shiftScene = useCallback(
-    (delta: number) => {
-      const cur = sceneIndexById(settingsRef.current.sceneId);
-      // 開けないシーンは飛ばす。止まると、WebGL2 が無い環境で GL シーンに
-      // 当たった瞬間にシーン送り（とオートサイクル）が固まってしまう。
-      for (let step = 1; step <= scenes.length; step++) {
-        const next = sceneByIndex(cur + delta * step);
-        if (next.id === settingsRef.current.sceneId) break;
-        if (rendererRef.current?.setScene(next.id)) {
-          applyUpdate({ sceneId: next.id });
-          return;
-        }
-      }
-    },
-    [applyUpdate],
-  );
-
   // ---- Look gacha: reroll the seed ----
   const reroll = useCallback(() => {
     applyUpdate({ seed: randomSeed() });
@@ -278,14 +197,11 @@ export function App(): React.ReactElement {
   // everything else (parameters/routes/palette/composition) from a fresh seed. This
   // is deliberately a separate action from `reroll` above (which swaps the whole
   // topology via the `seed` setting): `reroll` is the "new shape" gacha, this is the
-  // "same shape, new details" one. Only meaningful on the semantic-synth scene, which
-  // is the only scene with a VisualPatch (`currentPatch`) to reroll.
+  // "same shape, new details" one.
   const rerollDetails = useCallback((seed?: string) => {
     const control = getSynthControl();
     const current = control.getState().currentPatch;
-    // No semantic-synth scene active (or it hasn't derived a patch yet) — nothing to
-    // reroll. Backstops the disabled-button gating in ControlPanel for the moment
-    // right after switching scenes, before the first frame has run.
+    // The scene hasn't derived a patch yet (before the first frame) — nothing to reroll.
     if (!current) return;
     const next = rerollPatch(current, seed ?? randomSeed(), { catalog: inlineCatalog });
     control.proposePatch(JSON.parse(serializePatch(next)) as unknown);
@@ -307,13 +223,11 @@ export function App(): React.ReactElement {
     const engine = engineRef.current;
     const tempo = engine?.getTempoState();
     return {
-      sceneId: s.sceneId,
       hueMode: s.hueMode,
       fixedHue: s.fixedHue,
       baseHue: rendererRef.current?.currentHue ?? s.fixedHue,
       background: s.background,
       seed: s.seed,
-      autoCycle: s.autoCycle,
       bpm: tempo?.bpm ?? 0,
       tempoLocked: tempo?.tempoLocked ?? false,
       audioRunning: engine?.running ?? false,
@@ -331,15 +245,6 @@ export function App(): React.ReactElement {
           return { ok: true, issues: [] };
         case 'patch:rerollDetails':
           rerollDetails(command.seed);
-          return { ok: true, issues: [] };
-        case 'scene:set':
-          if (!scenes.some((s) => s.id === command.sceneId)) {
-            return { ok: false, issues: [`unknown scene: ${command.sceneId}`] };
-          }
-          setScene(command.sceneId);
-          return { ok: true, issues: [] };
-        case 'scene:shift':
-          shiftScene(command.delta);
           return { ok: true, issues: [] };
         case 'hue:mode':
           applyUpdate({ hueMode: command.mode });
@@ -361,12 +266,9 @@ export function App(): React.ReactElement {
           return { ok: true, issues: [] };
         case 'timeline:lock':
           return { ok: false, issues: ['timeline:lock is handled by host'] };
-        case 'autoCycle:set':
-          applyUpdate({ autoCycle: command.on });
-          return { ok: true, issues: [] };
       }
     },
-    [reroll, applyUpdate, rerollDetails, setScene, shiftScene, onTap, onTempoMultiply, onTempoAuto],
+    [reroll, applyUpdate, rerollDetails, onTap, onTempoMultiply, onTempoAuto],
   );
 
   const getAppStateRef = useRef(getAppState);
@@ -374,8 +276,7 @@ export function App(): React.ReactElement {
   const runCommandRef = useRef(runCommand);
   runCommandRef.current = runCommand;
 
-  // Push variation changes (seed reroll / edit) to the renderer, which re-inits
-  // the active scene so element-count arrays re-allocate against the new look.
+  // Push variation changes (seed reroll / edit) to the renderer.
   useEffect(() => {
     rendererRef.current?.setVariation(variation);
   }, [variation]);
@@ -386,31 +287,6 @@ export function App(): React.ReactElement {
     root.classList.toggle('bg-black', settings.background === 'black');
     root.classList.toggle('bg-transparent', settings.background === 'transparent');
   }, [settings.background]);
-
-  // ---- Auto-cycle (seconds) ----
-  useEffect(() => {
-    if (!settings.autoCycle || settings.cycleMode !== 'seconds') return;
-    const ms = Math.max(2, settings.cycleSeconds) * 1000;
-    const id = window.setInterval(() => shiftScene(1), ms);
-    return () => window.clearInterval(id);
-  }, [settings.autoCycle, settings.cycleMode, settings.cycleSeconds, shiftScene]);
-
-  // ---- Auto-cycle (bars): advance every N bars off the tempo grid ----
-  const lastSwitchedBarRef = useRef(0);
-  useEffect(() => {
-    if (!settings.autoCycle || settings.cycleMode !== 'bars') return;
-    const peek = engineRef.current?.peekFrame();
-    lastSwitchedBarRef.current = peek?.barCount ?? 0;
-    const id = window.setInterval(() => {
-      const f = engineRef.current?.peekFrame();
-      if (!f || f.bpm <= 0) return;
-      if (f.barCount - lastSwitchedBarRef.current >= settings.cycleBars) {
-        lastSwitchedBarRef.current = f.barCount;
-        shiftScene(1);
-      }
-    }, 100);
-    return () => window.clearInterval(id);
-  }, [settings.autoCycle, settings.cycleMode, settings.cycleBars, shiftScene]);
 
   // ---- Auto-gacha: reroll the look every N bars off the tempo grid ----
   const lastGachaBarRef = useRef(0);
@@ -458,24 +334,7 @@ export function App(): React.ReactElement {
     const onKey = (e: KeyboardEvent) => {
       if (isEditableTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
       const key = e.key;
-      // Digits 1–9 select scenes 1–9; 0 selects the 10th. Bounds-checked.
-      if (key >= '0' && key <= '9') {
-        const idx = key === '0' ? 9 : Number(key) - 1;
-        if (idx < scenes.length) {
-          e.preventDefault();
-          setScene(scenes[idx].id);
-        }
-        return;
-      }
       switch (key) {
-        case 'ArrowRight':
-          e.preventDefault();
-          shiftScene(1);
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          shiftScene(-1);
-          break;
         case 'h':
         case 'H':
           setPanelHidden((v) => !v);
@@ -483,10 +342,6 @@ export function App(): React.ReactElement {
         case 'f':
         case 'F':
           void toggleFullscreen();
-          break;
-        case 'a':
-        case 'A':
-          update({ autoCycle: !settingsRef.current.autoCycle });
           break;
         case 'b':
         case 'B':
@@ -517,7 +372,7 @@ export function App(): React.ReactElement {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [setScene, shiftScene, update, reroll, rerollDetails, onTap]);
+  }, [update, reroll, rerollDetails, onTap]);
 
   // ---- 外部 CLI からの Bridge（?bridge=1 のときだけ有効） ----
   // デッキ host は BroadcastChannel のみなので常時起動する（ネットワーク副作用なし）。
@@ -538,13 +393,11 @@ export function App(): React.ReactElement {
   return (
     <>
       <canvas id="vj-canvas-gl" ref={glCanvasRef} />
-      <canvas id="vj-canvas" ref={canvasRef} />
       <ControlPanel
         hidden={panelHidden}
         faded={idle && !panelHidden}
         settings={settings}
         update={update}
-        glAvailable={glAvailable}
         running={running}
         error={error}
         devices={devices}
@@ -552,8 +405,6 @@ export function App(): React.ReactElement {
         onToggleAudio={toggleAudio}
         onRefreshDevices={() => void refreshDevices()}
         onSelectDevice={selectDevice}
-        onSetScene={setScene}
-        onShiftScene={shiftScene}
         onToggleFullscreen={() => void toggleFullscreen()}
         onReroll={reroll}
         onRerollDetails={rerollDetails}
@@ -562,6 +413,11 @@ export function App(): React.ReactElement {
         onTempoAuto={onTempoAuto}
       />
       <TimelinePanel hidden={panelHidden} />
+      {!glAvailable && (
+        <div className="gl-required" role="alert">
+          WebGL2 が必要です
+        </div>
+      )}
     </>
   );
 }

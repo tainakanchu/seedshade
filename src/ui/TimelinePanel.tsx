@@ -340,7 +340,7 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
   const useAsStamp = (meta: ImageMeta): void => {
     const current = control.getState().currentPatch;
     if (!current) {
-      setImageIssues(['no active synth scene — switch to Semantic Synth']);
+      setImageIssues(['synth is not running (WebGL2 required)']);
       return;
     }
     const next = patchWithStamp(current, { name: meta.name, hash: meta.hash });
@@ -428,7 +428,7 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
             </span>
           </div>
           {!state.currentPatch && (
-            <div className="tl-note">no active synth scene — switch to Semantic Synth</div>
+            <div className="tl-note">synth is not running (WebGL2 required)</div>
           )}
         </div>
 

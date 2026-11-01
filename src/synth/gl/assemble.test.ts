@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { AUDIO_TEXTURE_GLSL } from '../audioTextures';
 import {
   assemblePatch,
+  audioTextureUnit,
   nsUniformName,
   PIPELINE_FN,
   SEED_UNIFORM,
@@ -493,5 +495,131 @@ describe('synth/gl preludes', () => {
     expect(assemblePatch(patch, inlineCatalog).fragSrc).toBe(
       assemblePatch(patch, inlineCatalog).fragSrc,
     );
+  });
+});
+
+describe('synth/gl/assemblePatch audio textures', () => {
+  /** `grid` with the same id/emit but an audio opt-in — topology (and reactions) unchanged. */
+  function gridWithAudio(audio: GeneratorDefinition['audio']): InlineGenerator {
+    const grid = inlineCatalog.get('grid')!;
+    return { ...grid, def: { ...grid.def, audio } };
+  }
+  function catalogWith(gen: InlineGenerator) {
+    return createInlineCatalog([
+      ...inlineCatalog.all().filter((g) => g.def.id !== gen.def.id),
+      gen,
+    ]);
+  }
+
+  it('patches without an audio generator declare nothing audio-related', () => {
+    for (const gen of inlineCatalog.all()) {
+      if (gen.def.audio?.length) continue;
+      const patch = {
+        ...defaultPatch(),
+        operators: [{ id: 'src0', generatorId: gen.def.id, generatorVersion: 1, parameters: {} }],
+      };
+      const { fragSrc, audioTextures } = assemblePatch(patch, inlineCatalog);
+      expect(audioTextures, gen.def.id).toEqual([]);
+      for (const needle of ['uSpectrum', 'uWave', 'spectrumAt', 'waveAt', 'SYNTH_WAVE_SAMPLES']) {
+        expect(fragSrc, `${gen.def.id} leaks ${needle}`).not.toContain(needle);
+      }
+    }
+  });
+
+  it('audio: [] / undefined assemble byte-identically', () => {
+    const base = assemblePatch(defaultPatch(), inlineCatalog).fragSrc;
+    const empty = assemblePatch(defaultPatch(), catalogWith(gridWithAudio([]))).fragSrc;
+    expect(empty).toBe(base);
+  });
+
+  it('opting in only inserts the sampler precision line and the audio block', () => {
+    const base = assemblePatch(defaultPatch(), inlineCatalog);
+    const withAudio = assemblePatch(
+      defaultPatch(),
+      catalogWith(gridWithAudio(['wave', 'spectrum'])),
+    );
+
+    expect(withAudio.audioTextures).toEqual([
+      { kind: 'spectrum', name: 'uSpectrum' },
+      { kind: 'wave', name: 'uWave' },
+    ]);
+    expect(withAudio.reactions).toEqual(base.reactions);
+    const src = withAudio.fragSrc;
+    expect(src).toContain('precision highp sampler2D;');
+    expect(src).toContain('uniform sampler2D uSpectrum;');
+    expect(src).toContain('uniform sampler2D uWave;');
+    expect(src).toContain('float spectrumAt(float x)');
+    expect(src).toContain('float spectrumPeakAt(float x)');
+    expect(src).toContain('float waveAt(float x)');
+    expect(src).toContain('vec2 waveXYSample(int i)');
+    // declarations come before any generator function can call the helpers
+    expect(src.indexOf('float spectrumAt(')).toBeLessThan(
+      src.indexOf('// --- generator functions ---'),
+    );
+    expect(src.indexOf('uniform sampler2D uSpectrum;')).toBeLessThan(
+      src.indexOf('uniform sampler2D uWave;'),
+    );
+
+    // Remove exactly what the opt-in adds → the audio-free source, byte for byte.
+    const audioBlock = `${AUDIO_TEXTURE_GLSL.spectrum}\n${AUDIO_TEXTURE_GLSL.wave}\n\n`;
+    expect(src).toContain(audioBlock);
+    const stripped = src.replace(audioBlock, '').replace('precision highp sampler2D;\n', '');
+    expect(stripped).toBe(base.fragSrc);
+  });
+
+  it('only the requested kinds are declared', () => {
+    const { fragSrc, audioTextures } = assemblePatch(
+      defaultPatch(),
+      catalogWith(gridWithAudio(['spectrum'])),
+    );
+    expect(audioTextures.map((a) => a.kind)).toEqual(['spectrum']);
+    expect(fragSrc).toContain('uSpectrum');
+    expect(fragSrc).not.toContain('uWave');
+  });
+
+  it('two audio operators share one declaration', () => {
+    const patch: VisualPatch = {
+      ...defaultPatch(),
+      operators: [
+        { id: 'src0', generatorId: 'spectrumBars', generatorVersion: 1, parameters: {} },
+        { id: 'src1', generatorId: 'spectrumRadial', generatorVersion: 1, parameters: {} },
+        { id: 'src2', generatorId: 'oscilloscope', generatorVersion: 1, parameters: {} },
+      ],
+    };
+    const { fragSrc, audioTextures } = assemblePatch(patch, inlineCatalog);
+    expect(audioTextures.map((a) => a.kind)).toEqual(['spectrum', 'wave']);
+    expect(fragSrc.split('uniform sampler2D uSpectrum;').length - 1).toBe(1);
+    expect(fragSrc.split('float waveAt(float x)').length - 1).toBe(1);
+  });
+
+  it('audio units follow the image slots', () => {
+    const patch: VisualPatch = {
+      ...stampPatch(),
+      operators: [
+        ...stampPatch().operators,
+        { id: 'src1', generatorId: 'spectrumBars', generatorVersion: 1, parameters: {} },
+      ],
+    };
+    const assembled = assemblePatch(patch, inlineCatalog);
+    expect(assembled.textures.length).toBe(1);
+    expect(audioTextureUnit(assembled, 0)).toBe(1);
+  });
+
+  it('the shipped audio generators declare exactly what they sample', () => {
+    for (const gen of inlineCatalog.all()) {
+      const body = gen.emit({
+        fnName: 'f',
+        uniform: (p) => `u_${p}`,
+        nsUniform: 'ns',
+        seedUniform: 'seed',
+        texUniform: () => 't',
+        texSizeUniform: () => 's',
+      });
+      const usesSpectrum = /spectrum(Peak|Raw)?At\(/.test(body);
+      const usesWave = /wave(At|Sample|XYSample)\(/.test(body);
+      const declared = new Set(gen.def.audio ?? []);
+      expect(declared.has('spectrum'), `${gen.def.id} spectrum`).toBe(usesSpectrum);
+      expect(declared.has('wave'), `${gen.def.id} wave`).toBe(usesWave);
+    }
   });
 });

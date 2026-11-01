@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AudioEngine } from '../audio/AudioEngine';
 import { openSceneDeck } from '../deck/openDeck';
-import { scenes } from '../scenes';
 import {
   dbToFraction,
   INITIAL_CLIP_LATCH,
@@ -21,8 +20,6 @@ interface ControlPanelProps {
   faded: boolean;
   settings: Settings;
   update: (patch: Partial<Settings>) => void;
-  /** Whether WebGL2 is usable; GL scenes are disabled in the picker when false. */
-  glAvailable: boolean;
   running: boolean;
   error: string | null;
   devices: MediaDeviceInfo[];
@@ -31,8 +28,6 @@ interface ControlPanelProps {
   onRefreshDevices: () => void;
   /** Select an input device; live capture is restarted on it automatically. */
   onSelectDevice: (deviceId: string) => void;
-  onSetScene: (id: string) => void;
-  onShiftScene: (delta: number) => void;
   onToggleFullscreen: () => void;
   /** Reroll the look-gacha seed to a fresh random value. */
   onReroll: () => void;
@@ -40,8 +35,7 @@ interface ControlPanelProps {
    * Reroll parameters/routes/palette/composition from a fresh seed while keeping
    * the current Semantic Synth operators (topology) exactly as-is — same "shape"
    * and audio-reactive glitch set as `onReroll` would normally also shuffle, just
-   * with new details. Only meaningful when a semantic-synth VisualPatch exists;
-   * disabled in the UI otherwise (see `settings.sceneId` gating below).
+   * with new details. A no-op until the first frame has derived a VisualPatch.
    */
   onRerollDetails: () => void;
   /** Tap tempo (manual BPM). */
@@ -105,7 +99,6 @@ export function ControlPanel(props: ControlPanelProps): React.ReactElement {
     faded,
     settings,
     update,
-    glAvailable,
     running,
     error,
     devices,
@@ -113,8 +106,6 @@ export function ControlPanel(props: ControlPanelProps): React.ReactElement {
     onToggleAudio,
     onRefreshDevices,
     onSelectDevice,
-    onSetScene,
-    onShiftScene,
     onToggleFullscreen,
     onReroll,
     onRerollDetails,
@@ -385,13 +376,8 @@ export function ControlPanel(props: ControlPanelProps): React.ReactElement {
             type="button"
             className="btn"
             onClick={onRerollDetails}
-            disabled={settings.sceneId !== 'semantic-synth'}
             aria-label="Reroll details, same operators"
-            title={
-              settings.sceneId === 'semantic-synth'
-                ? 'Reroll details — same operators, new parameters/routes/palette/composition (D)'
-                : 'Reroll details is only available on the Semantic Synth scene'
-            }
+            title="Reroll details — same operators, new parameters/routes/palette/composition (D)"
           >
             🧬
           </button>
@@ -414,44 +400,6 @@ export function ControlPanel(props: ControlPanelProps): React.ReactElement {
             </option>
           ))}
         </select>
-      </div>
-
-      <div className="row">
-        <div className="row-label">
-          <span>Scene</span>
-          <span className="row-value">
-            {scenes.findIndex((s) => s.id === settings.sceneId) + 1}/{scenes.length}
-          </span>
-        </div>
-        <div className="btn-row tight">
-          <button
-            type="button"
-            className="btn icon"
-            onClick={() => onShiftScene(-1)}
-            aria-label="Previous scene"
-          >
-            ‹
-          </button>
-          <select value={settings.sceneId} onChange={(e) => onSetScene(e.target.value)}>
-            {scenes.map((s) => {
-              const disabled = s.kind === 'gl' && !glAvailable;
-              return (
-                <option key={s.id} value={s.id} disabled={disabled}>
-                  {s.name}
-                  {disabled ? '（WebGL2なし）' : ''}
-                </option>
-              );
-            })}
-          </select>
-          <button
-            type="button"
-            className="btn icon"
-            onClick={() => onShiftScene(1)}
-            aria-label="Next scene"
-          >
-            ›
-          </button>
-        </div>
       </div>
 
       <div className="row">
@@ -529,63 +477,6 @@ export function ControlPanel(props: ControlPanelProps): React.ReactElement {
 
       <div className="row">
         <div className="row-label">
-          <span>Auto-cycle</span>
-          <span className="row-value">
-            {settings.cycleMode === 'bars'
-              ? `${settings.cycleBars} bars`
-              : `${settings.cycleSeconds}s`}
-          </span>
-        </div>
-        <div className="btn-row">
-          <button
-            type="button"
-            className={`btn toggle${settings.autoCycle ? ' on' : ''}`}
-            onClick={() => update({ autoCycle: !settings.autoCycle })}
-          >
-            {settings.autoCycle ? 'On' : 'Off'}
-          </button>
-          {settings.cycleMode === 'bars' ? (
-            <input
-              type="number"
-              min={1}
-              max={256}
-              step={1}
-              value={settings.cycleBars}
-              onChange={(e) => update({ cycleBars: Number(e.target.value) })}
-              aria-label="Cycle bars"
-            />
-          ) : (
-            <input
-              type="number"
-              min={2}
-              max={600}
-              step={1}
-              value={settings.cycleSeconds}
-              onChange={(e) => update({ cycleSeconds: Number(e.target.value) })}
-              aria-label="Cycle seconds"
-            />
-          )}
-        </div>
-        <div className="btn-row" style={{ marginTop: 6 }}>
-          <button
-            type="button"
-            className={`btn toggle${settings.cycleMode === 'seconds' ? ' on' : ''}`}
-            onClick={() => update({ cycleMode: 'seconds' })}
-          >
-            Sec
-          </button>
-          <button
-            type="button"
-            className={`btn toggle${settings.cycleMode === 'bars' ? ' on' : ''}`}
-            onClick={() => update({ cycleMode: 'bars' })}
-          >
-            Bars
-          </button>
-        </div>
-      </div>
-
-      <div className="row">
-        <div className="row-label">
           <span>🎲 Auto-gacha</span>
           <span className="row-value">every {settings.gachaBars} bars</span>
         </div>
@@ -627,10 +518,8 @@ export function ControlPanel(props: ControlPanelProps): React.ReactElement {
       </div>
 
       <div className="cheats">
-        <kbd>1</kbd>–<kbd>9</kbd>,<kbd>0</kbd> scene · <kbd>←</kbd>
-        <kbd>→</kbd> prev/next · <kbd>H</kbd> panel · <kbd>F</kbd> fullscreen · <kbd>A</kbd>{' '}
-        auto-cycle · <kbd>B</kbd> background · <kbd>R</kbd> reroll · <kbd>D</kbd> reroll details ·{' '}
-        <kbd>S</kbd> scene deck · <kbd>T</kbd> tap
+        <kbd>H</kbd> panel · <kbd>F</kbd> fullscreen · <kbd>B</kbd> background · <kbd>R</kbd> reroll
+        · <kbd>D</kbd> reroll details · <kbd>S</kbd> scene deck · <kbd>T</kbd> tap
       </div>
     </div>
   );

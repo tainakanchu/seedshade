@@ -72,7 +72,6 @@ function stubControl(
     tempoLocked: init.tempoLocked ?? false,
     firedIds: init.firedIds ?? [],
     reactions: [],
-    blendMode: 'normal',
     hue: init.hue ?? 0,
   };
   const control: SynthControl = {
@@ -85,7 +84,6 @@ function stubControl(
     startRecording: () => {},
     stopRecording: () => null,
     loadRecording: () => ({ ok: true, issues: [] }),
-    setBlendMode: () => ({ ok: true, mode: 'normal' }),
     subscribe: () => () => {},
   };
   return { control, applyTimelineOp };
@@ -97,13 +95,11 @@ function triggerMsg(patch: VisualPatch, label: string, preset: TransitionPresetI
 
 function sampleApp(overrides: Partial<DeckAppState> = {}): DeckAppState {
   return {
-    sceneId: 'semantic-synth',
     hueMode: 'cycle',
     fixedHue: 200,
     baseHue: 180,
     background: 'black',
     seed: 'neon-prism-001',
-    autoCycle: false,
     bpm: 128,
     tempoLocked: true,
     audioRunning: true,
@@ -312,18 +308,18 @@ describe('handleDeckRequest', () => {
   it('commandResult carries handler failure issues', () => {
     const { control } = stubControl();
     const handlers = stubHandlers({
-      runCommand: vi.fn<RunCommand>(() => ({ ok: false, issues: ['unknown scene: nope'] })),
+      runCommand: vi.fn<RunCommand>(() => ({ ok: false, issues: ['boom'] })),
     });
     const posted = collect(
       control,
-      { kind: 'deck:command', id: 'cmd-fail', command: { kind: 'scene:set', sceneId: 'nope' } },
+      { kind: 'deck:command', id: 'cmd-fail', command: { kind: 'tempo:tap' } },
       handlers,
     );
     expect(posted[0]).toEqual({
       kind: 'deck:commandResult',
       id: 'cmd-fail',
       ok: false,
-      issues: ['unknown scene: nope'],
+      issues: ['boom'],
     });
     expect(posted[1]?.kind).toBe('deck:state');
   });

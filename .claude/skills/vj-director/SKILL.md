@@ -27,7 +27,7 @@ CLI (`scripts/vj-ctl.mjs`) から操縦する。叩いているのは `src/synth
 2. **ユーザーにアプリを開いてもらう** — URL に `bridge=1` が要る。
 
    ```
-   https://localhost:5173/?scene=semantic-synth&bridge=1
+   https://localhost:5173/?bridge=1
    ```
 
    ポートは `pnpm dev` の出力に従う。自己署名証明書なのでブラウザに警告が出ますが、詳細設定からアクセスを許可してください。`bridge=1` が無いとブラウザ側は中継に接続しないので、
@@ -35,8 +35,8 @@ CLI (`scripts/vj-ctl.mjs`) から操縦する。叩いているのは `src/synth
    （こちらからブラウザは開けない）。
 
    サブモニタなど複数台に同じ映像を出したいときは、メイン 1 台を通常どおり
-   `?scene=semantic-synth&bridge=1`（synth、応答を返す）で開き、残りを
-   `?scene=semantic-synth&bridge=1&mirror=1`（表示専用）で開く。mirror は何台でも可。
+   `?bridge=1`（synth、応答を返す）で開き、残りを
+   `?bridge=1&mirror=1`（表示専用）で開く。mirror は何台でも可。
 
 3. **疎通確認**
 
@@ -62,12 +62,12 @@ CLI (`scripts/vj-ctl.mjs`) から操縦する。叩いているのは `src/synth
 
    `room` / `pageUrl` / `ctlArgs` が JSON で返る。
 
-2. `pageUrl` をユーザーに開いてもらう — `?scene=semantic-synth&room=<id>` が付いている必要がある。
+2. `pageUrl` をユーザーに開いてもらう — `?room=<id>` が付いている必要がある。
    ここは**ユーザーに頼む**しかない（こちらからブラウザは開けない）。
 
    複数台に同じ映像を出す場合:
-   - メイン（synth、応答を返す 1 台）: `?scene=semantic-synth&room=<id>`
-   - サブモニタ（mirror、何台でも可）: `?scene=semantic-synth&room=<id>&mirror=1`
+   - メイン（synth、応答を返す 1 台）: `?room=<id>`
+   - サブモニタ（mirror、何台でも可）: `?room=<id>&mirror=1`
 
 3. 疎通確認して、以降は**すべてのコマンドに同じ `--url` を付ける**
 
@@ -300,7 +300,7 @@ budget/cost チェックを含まない。** 複製は放っておくと古く�
 ## vj-gen.mjs — ムード語から生成する
 
 `"雲 静寂 青"` のような気分語（日本語 / 英語 / ローマ字が混在してよい）を
-`scripts/vj-vocab.json` で引き、101 個の Generator カタログに対してタグ制約付きの
+`scripts/vj-vocab.json` で引き、127 個の Generator カタログに対してタグ制約付きの
 **決定的な重み付きサンプリング**（Efraimidis–Spirakis）で operators / palette / composition /
 routes を組み立てる。**手書きプリセットは無い** — 同じ小さな語彙から無限のバリエーションが
 出る。同じ語 + 同じ seed なら常に同じ Patch になる（Math.random は使わない）。

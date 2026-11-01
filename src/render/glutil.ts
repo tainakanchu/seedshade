@@ -98,7 +98,7 @@ export interface Fbo {
 /**
  * Create a colour FBO of size w×h. `internalFormat` defaults to RGBA8; pass a
  * float format (e.g. gl.RGBA16F) for HDR/feedback targets — the caller must
- * have verified float-colour support via {@link checkFloatColorSupport}.
+ * have verified float-colour render support (EXT_color_buffer_float).
  */
 export function createFbo(
   gl: WebGL2RenderingContext,
@@ -132,68 +132,6 @@ export function createFbo(
 export function disposeFbo(gl: WebGL2RenderingContext, f: Fbo): void {
   gl.deleteFramebuffer(f.fbo);
   gl.deleteTexture(f.tex);
-}
-
-/** A ping-pong pair of identically-sized FBOs for feedback/sim passes. */
-export interface PingPong {
-  read: Fbo;
-  write: Fbo;
-  /** Swap read/write after a pass. */
-  swap(): void;
-  dispose(gl: WebGL2RenderingContext): void;
-}
-
-/** Create a ping-pong FBO pair (used by feedback / fluid scenes). */
-export function createPingPong(
-  gl: WebGL2RenderingContext,
-  w: number,
-  h: number,
-  internalFormat: number = gl.RGBA8,
-): PingPong {
-  let a = createFbo(gl, w, h, internalFormat);
-  let b = createFbo(gl, w, h, internalFormat);
-  return {
-    get read() {
-      return a;
-    },
-    get write() {
-      return b;
-    },
-    swap() {
-      const tmp = a;
-      a = b;
-      b = tmp;
-    },
-    dispose(g: WebGL2RenderingContext) {
-      disposeFbo(g, a);
-      disposeFbo(g, b);
-    },
-  };
-}
-
-/** Result of probing the context for float-colour render support. */
-export interface FloatColorSupport {
-  /** Can render to RGBA16F/RG16F colour attachments (EXT_color_buffer_float). */
-  rgba16f: boolean;
-  /** Can render to RGBA32F (EXT_color_buffer_float covers this on WebGL2). */
-  rgba32f: boolean;
-  /** True if linear filtering of float textures is available. */
-  floatLinear: boolean;
-}
-
-/**
- * Probe float-colour render support once at context creation. The procedural
- * scenes here don't need it, but the future fluid scene will require RG16F /
- * RGBA16F render targets, so we expose the capability up front.
- */
-export function checkFloatColorSupport(gl: WebGL2RenderingContext): FloatColorSupport {
-  const colorBufferFloat = gl.getExtension('EXT_color_buffer_float') !== null;
-  const floatLinear = gl.getExtension('OES_texture_float_linear') !== null;
-  return {
-    rgba16f: colorBufferFloat,
-    rgba32f: colorBufferFloat,
-    floatLinear,
-  };
 }
 
 /**

@@ -23,7 +23,6 @@ const view: DeckKeyView = {
   fixedHue: 200,
   hue: 213,
   background: 'black',
-  autoCycle: false,
   locked: false,
 };
 
@@ -112,14 +111,8 @@ describe('keyToAction', () => {
       type: 'command',
       command: { kind: 'timeline:lock', seconds: 0 },
     });
-    expect(keyToAction(evt('KeyA', { shiftKey: true }), view)).toEqual({
-      type: 'command',
-      command: { kind: 'autoCycle:set', on: true },
-    });
-    expect(keyToAction(evt('KeyA', { shiftKey: true }), { ...view, autoCycle: true })).toEqual({
-      type: 'command',
-      command: { kind: 'autoCycle:set', on: false },
-    });
+    // Shift+A (旧: シーン自動送り) は廃止。bank 自動送りに化けないこと。
+    expect(keyToAction(evt('KeyA', { shiftKey: true }), view)).toBeNull();
   });
 
   it('ignores key-repeat for tempo multiply/auto but allows hue sweep', () => {
@@ -136,14 +129,14 @@ describe('keyToAction', () => {
     });
   });
 
-  it('maps Shift+Arrow to scene:shift and does not also move the cursor', () => {
+  it('Shift+Arrow just moves the cursor (scene shift was removed)', () => {
     expect(keyToAction(evt('ArrowLeft', { shiftKey: true }))).toEqual({
-      type: 'command',
-      command: { kind: 'scene:shift', delta: -1 },
+      type: 'cursor',
+      dir: 'left',
     });
     expect(keyToAction(evt('ArrowRight', { shiftKey: true }))).toEqual({
-      type: 'command',
-      command: { kind: 'scene:shift', delta: 1 },
+      type: 'cursor',
+      dir: 'right',
     });
     expect(keyToAction(evt('ArrowUp', { shiftKey: true }))).toEqual({
       type: 'cursor',

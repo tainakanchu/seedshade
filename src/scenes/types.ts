@@ -1,44 +1,6 @@
 import type { AudioFrame } from '../audio/types';
 import type { Variation } from '../variation/types';
 
-/** Per-frame drawing context handed to a 2D scene's {@link Scene2D.draw}. */
-export interface SceneContext {
-  ctx: CanvasRenderingContext2D;
-  /** Logical width in CSS pixels (ctx is already scaled for DPR). */
-  w: number;
-  /** Logical height in CSS pixels. */
-  h: number;
-  /** Seconds since the renderer started. */
-  t: number;
-  /** Seconds since the previous frame, clamped to <= 0.1. */
-  dt: number;
-  /** Current analysed audio. */
-  audio: AudioFrame;
-  /** Current base hue, 0..360 (already includes the variation's hueOffset). */
-  hue: number;
-  /** Seeded "look gacha" variation driving colour, motion, layout, etc. */
-  va: Variation;
-}
-
-/** A self-contained Canvas-2D audio-reactive visual. */
-export interface Scene2D {
-  /** Discriminates the rendering path. */
-  kind: '2d';
-  /** Stable identifier used in settings / URLs. */
-  id: string;
-  /** Human-readable label for the UI. */
-  name: string;
-  /**
-   * Motion-trail amount. 0 clears fully each frame; 0..1 fades previous
-   * content by that fraction for a persistence-of-vision trail.
-   */
-  trail: number;
-  /** Reset internal state when the scene becomes active. */
-  init?(): void;
-  /** Draw one frame. */
-  draw(s: SceneContext): void;
-}
-
 /**
  * Per-frame context handed to a GL scene's {@link GlScene.draw}. All sizes are
  * already resolved; the viewport is set by the renderer before draw is called.
@@ -88,5 +50,5 @@ export interface GlScene {
   dispose(gl: WebGL2RenderingContext): void;
 }
 
-/** Any registered scene. */
-export type Scene = Scene2D | GlScene;
+/** Any registered scene. Seedshade is single-scene, so this is just the GL scene. */
+export type Scene = GlScene;

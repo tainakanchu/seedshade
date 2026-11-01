@@ -996,5 +996,111 @@
       "lightness": 28
     },
     "energy": 0.18
+  },
+  "スペクトラム": {
+    "aliases": ["spectrum", "スペアナ", "analyzer", "イコライザー", "equalizer", "すぺくとらむ"],
+    "tags": {
+      "material": ["spectrum"],
+      "motion": ["audio-reactive", "pulse"],
+      "affect": ["electric", "rhythmic"],
+      "environment": ["club"]
+    },
+    "composition": {
+      "speed": 0.6
+    },
+    "energy": 0.65
+  },
+  "オシロ": {
+    "aliases": ["oscilloscope", "scope", "オシロスコープ", "波形", "waveform", "おしろ"],
+    "tags": {
+      "material": ["oscilloscope", "phosphor"],
+      "motion": ["audio-reactive", "wave"],
+      "affect": ["technical", "retro-tech"]
+    },
+    "palette": {
+      "saturation": 45,
+      "lightness": 60
+    },
+    "energy": 0.5
+  },
+  "リサージュ": {
+    "aliases": ["lissajous", "りさーじゅ"],
+    "tags": {
+      "material": ["oscilloscope", "phosphor"],
+      "motion": ["rotate"],
+      "affect": ["hypnotic", "technical"]
+    },
+    "composition": {
+      "symmetry": 1
+    },
+    "energy": 0.45
+  },
+  "オーロラ": {
+    "aliases": ["aurora", "おーろら"],
+    "tags": {
+      "material": ["aurora"],
+      "motion": ["wave", "sway"],
+      "affect": ["cosmic", "dreamy", "calm", "cold"],
+      "environment": ["space"]
+    },
+    "composition": {
+      "speed": 0.2
+    },
+    "palette": {
+      "hueOffset": 140,
+      "saturation": 55,
+      "lightness": 55
+    },
+    "energy": 0.3
+  },
+  "煙": {
+    "aliases": ["smoke", "けむり", "スモーク", "fog"],
+    "tags": {
+      "material": ["smoke"],
+      "motion": ["drift", "turbulent"],
+      "affect": ["hazy", "eerie"]
+    },
+    "composition": {
+      "speed": 0.25
+    },
+    "palette": {
+      "saturation": 12,
+      "lightness": 60
+    },
+    "energy": 0.3
+  },
+  "パーティクル": {
+    "aliases": ["particle", "particles", "粒子", "ぱーてぃくる", "星屑", "stardust"],
+    "tags": {
+      "material": ["particle", "spark"],
+      "motion": ["drift", "flythrough"],
+      "affect": ["cosmic", "kinetic"],
+      "environment": ["space"]
+    },
+    "energy": 0.55
+  },
+  "リング": {
+    "aliases": ["rings", "ring", "りんぐ"],
+    "tags": {
+      "material": ["ring"],
+      "motion": ["radial", "pulse", "burst"],
+      "affect": ["rhythmic", "propulsive"]
+    },
+    "composition": {
+      "symmetry": 1
+    },
+    "energy": 0.6
+  },
+  "マーブル": {
+    "aliases": ["marble", "墨流し", "すみながし", "suminagashi", "まーぶる"],
+    "tags": {
+      "material": ["marble", "ink"],
+      "motion": ["swirl", "drift"],
+      "affect": ["organic", "liquid"]
+    },
+    "composition": {
+      "speed": 0.15
+    },
+    "energy": 0.3
   }
 }

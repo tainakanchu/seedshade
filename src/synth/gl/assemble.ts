@@ -4,6 +4,12 @@ import type {
   VisualOperator,
   VisualPatch,
 } from '../types';
+import {
+  AUDIO_TEXTURE_GLSL,
+  AUDIO_TEXTURE_UNIFORM,
+  canonicalAudioKinds,
+  type AudioTextureKind,
+} from '../audioTextures';
 import type { InlineGenerator, InlineGeneratorCatalog } from '../generators/types';
 import { RNG_GLSL } from '../rng.glsl';
 import { resolvePreludes } from './preludes';
@@ -85,6 +91,13 @@ export interface TextureBinding {
   sizeName: string;
 }
 
+/** One per-frame audio texture the patch reads (see ../audioTextures). */
+export interface AudioTextureBinding {
+  kind: AudioTextureKind;
+  /** sampler2D uniform name (`uSpectrum` / `uWave`). */
+  name: string;
+}
+
 export interface AssembledShader {
   fragSrc: string;
   uniforms: Array<{ opId: string; paramId: string; name: string }>;
@@ -94,6 +107,12 @@ export interface AssembledShader {
    * テクスチャを使わない Patch では空配列。
    */
   textures: TextureBinding[];
+  /**
+   * この Patch が読むオーディオ・テクスチャ（canonical 順: spectrum → wave）。
+   * どの Generator も `def.audio` を宣言していなければ空配列。シーンは画像スロット
+   * の後ろのテクスチャユニットにこの順で割り当てる（{@link audioTextureUnit}）。
+   */
+  audioTextures: AudioTextureBinding[];
   /** この Patch に載ったオーディオ・リアクションの id（座標段 → 色段の順）。 */
   reactions: string[];
 }
@@ -108,6 +127,14 @@ export interface AssembleOptions {
    * - `string[]`: id を明示。テストで特定のリアクションを名指しするため。
    */
   reactions?: 'auto' | 'off' | readonly string[];
+}
+
+/**
+ * Texture unit for `assembled.audioTextures[index]`: image slots take units
+ * `0..textures.length-1`, audio textures follow in canonical order.
+ */
+export function audioTextureUnit(assembled: AssembledShader, index: number): number {
+  return assembled.textures.length + index;
 }
 
 /** Role used for fn naming and main() stage ordering. */
@@ -170,6 +197,8 @@ export function assemblePatch(
   const textures: TextureBinding[] = [];
   /** Prelude keys in operator order; resolvePreludes dedupes and keeps first-seen order. */
   const preludeKeys: string[] = [];
+  /** Audio-texture kinds requested by any operator; canonicalised after the loop. */
+  const audioRequested: AudioTextureKind[] = [];
 
   // Resolve operators in stable order (patch.operators appearance order).
   const resolved: ResolvedOp[] = [];
@@ -204,6 +233,7 @@ export function assemblePatch(
     }));
     textures.push(...opTextures);
     preludeKeys.push(...(gen.preludes ?? []));
+    audioRequested.push(...(gen.def.audio ?? []));
     resolved.push({ op, gen, def: gen.def, role, fnName, nsName, textures: opTextures });
     nsUniforms.push({ opId: op.id, name: nsName });
     for (const param of gen.def.parameters) {
@@ -231,15 +261,22 @@ export function assemblePatch(
   const reactionIds = [...reactions.coord, ...reactions.color].map((r) => r.id);
   const hasReactions = reactionIds.length > 0;
 
+  const audioKinds = canonicalAudioKinds(audioRequested);
+  const audioTextures: AudioTextureBinding[] = audioKinds.map((kind) => ({
+    kind,
+    name: AUDIO_TEXTURE_UNIFORM[kind],
+  }));
+
   const lines: string[] = [];
 
   // ---- header ----
   lines.push('#version 300 es');
   lines.push('precision highp float;');
   lines.push('precision highp int;');
-  if (textures.length > 0) {
+  if (textures.length > 0 || audioTextures.length > 0) {
     // GLSL ES 3.00 defaults samplers to lowp in the fragment stage. Only emitted
-    // when a slot exists so texture-free patches keep byte-identical sources.
+    // when a slot / audio texture exists so texture-free patches keep
+    // byte-identical sources.
     lines.push('precision highp sampler2D;');
   }
   lines.push('');
@@ -267,6 +304,15 @@ export function assemblePatch(
     lines.push(`const uint ${REACTION_NS_CONST} = ${reactionNamespace(reactionKey) >>> 0}u;`);
   }
   lines.push('');
+
+  // ---- per-frame audio textures (opt-in via GeneratorDefinition.audio) ----
+  // Only for patches that read them, so every other patch stays byte-identical.
+  if (audioTextures.length > 0) {
+    for (const a of audioTextures) {
+      lines.push(AUDIO_TEXTURE_GLSL[a.kind]);
+    }
+    lines.push('');
+  }
 
   // ---- param + ns uniforms (operators array order, params in definition order) ----
   lines.push('// --- operator uniforms ---');
@@ -427,6 +473,7 @@ export function assemblePatch(
     uniforms,
     nsUniforms,
     textures,
+    audioTextures,
     reactions: reactionIds,
   };
 }

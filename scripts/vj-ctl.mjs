@@ -79,9 +79,6 @@ const USAGE = `使い方: node scripts/vj-ctl.mjs <command> [options]
   catalog                      Generator カタログ（id / category / tags / parameters）を表示
   seed <seed>                  seed から派生した Patch へ即遷移
   patch <file.json>            VisualPatch を即適用（検証に落ちると issues が返る）
-  blend <mode>                 オーバーレイ合成のブレンドモード
-                               （normal/screen/multiply/overlay/difference/exclusion/
-                               color-dodge/hard-light/lighten/darken）
   image <file> [--name <n>]    画像 (png/jpg/webp/svg) を読み込ませる（上限 ${
     MAX_IMAGE_BYTES / 1024 / 1024
   }MB）
@@ -109,7 +106,6 @@ room 専用オプション:
 例:
   node scripts/vj-ctl.mjs state
   node scripts/vj-ctl.mjs seed "take-1"
-  node scripts/vj-ctl.mjs blend screen
   node scripts/vj-ctl.mjs image ./logo.png --name event-logo
   node scripts/vj-ctl.mjs event add --in 30 --seed take-2 --transition slow
   node scripts/vj-ctl.mjs event add --bar 8 --patch /tmp/patch.json
@@ -364,12 +360,6 @@ async function run(conn, positional, flags) {
       return jsonOut(await conn.request('proposeSeed', { seed: rest[0] }));
     }
 
-    case 'blend': {
-      if (rest.length === 0) usageError('blend には <mode> が必要です');
-      // 不正値も control 側が normal に倒して ok:true + warning を返す。
-      return jsonOut(await conn.request('setBlendMode', { mode: rest[0] }));
-    }
-
     case 'patch': {
       if (rest.length === 0) usageError('patch には <file.json> が必要です');
       const patch = readJsonFile(rest[0], 'patch');
@@ -486,8 +476,8 @@ function hintFor(message, target) {
   const isRelay = target.includes('/room/');
   if (message.includes('no synth connected')) {
     return isRelay
-      ? 'ブラウザで `?scene=semantic-synth&room=<id>` 付きの URL を開いているか、room id が一致しているか確認してください。'
-      : 'アプリを `?scene=semantic-synth&bridge=1` 付きで開いているか確認してください。';
+      ? 'ブラウザで `?room=<id>` 付きの URL を開いているか、room id が一致しているか確認してください。'
+      : 'アプリを `?bridge=1` 付きで開いているか確認してください。';
   }
   if (message.includes('ECONNREFUSED') || message.includes('接続が切れました')) {
     return isRelay
@@ -521,7 +511,7 @@ async function main() {
       const room = randomBytes(16).toString('base64url');
       const res = jsonOut({
         room,
-        pageUrl: `https://${host}/?scene=semantic-synth&room=${room}`,
+        pageUrl: `https://${host}/?room=${room}`,
         ctlArgs: `--url wss://${host}/room/${room}`,
       });
       process.stdout.write(res.output);

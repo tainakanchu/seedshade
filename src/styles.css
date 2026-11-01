@@ -46,30 +46,28 @@ html.cursor-hidden * {
   cursor: none !important;
 }
 
-#vj-canvas,
 #vj-canvas-gl {
   position: fixed;
   inset: 0;
+  z-index: 0;
   display: block;
   width: 100vw;
   height: 100vh;
 }
 
-/* Both canvases are transparent; only the active scene's canvas is shown so the
-   compositor never pays for both and page transparency stays intact. */
-#vj-canvas {
-  z-index: 1;
-}
-#vj-canvas-gl {
-  z-index: 0;
-}
-/* When a GL scene is drawn as the overlay layer it must composite above the
-   2D base layer, so it is lifted out of its default position. */
-#vj-canvas-gl.canvas-lifted {
-  z-index: 2;
-}
-.canvas-hidden {
-  display: none;
+/* Shown instead of the (blank) canvas when WebGL2 is unavailable. */
+.gl-required {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: hsl(8, 90%, 82%);
+  background: rgba(220, 60, 50, 0.16);
+  border: 1px solid rgba(220, 80, 70, 0.4);
 }
 
 /* ---- Control panel ---- */
@@ -1041,12 +1039,6 @@ html.deck-mode #root {
 .deck-console .btn.tap {
   font-weight: 700;
   letter-spacing: 0.04em;
-}
-
-.deck-scene-select {
-  width: auto;
-  min-width: 148px;
-  flex: 0 0 auto;
 }
 
 .deck-hue {

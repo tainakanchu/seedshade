@@ -277,6 +277,34 @@ describe('parseMidiMapping', () => {
     ).toBeNull();
   });
 
+  it('skips bindings that reference retired scene actions and keeps the rest', () => {
+    const keep = {
+      trigger: { kind: 'note', ch: 'any', note: 42 },
+      action: { type: 'trigger', slot: 3 },
+    };
+    const input = {
+      version: 1,
+      name: 'legacy',
+      bindings: [
+        {
+          trigger: { kind: 'note', ch: 0, note: 60 },
+          action: { type: 'command', command: { kind: 'scene:shift', delta: 1 } },
+        },
+        keep,
+        {
+          trigger: { kind: 'note', ch: 0, note: 61 },
+          action: { type: 'command', command: { kind: 'scene:set', sceneId: 'bars' } },
+        },
+        {
+          trigger: { kind: 'note', ch: 0, note: 62 },
+          action: { type: 'command', command: { kind: 'autoCycle:set', on: true } },
+        },
+      ],
+    };
+    expect(parseMidiMapping(input)).toEqual({ version: 1, name: 'legacy', bindings: [keep] });
+    expect(parseMidiStorage({ activeMapping: input })?.activeMapping?.bindings).toEqual([keep]);
+  });
+
   it('accepts a valid mapping and the nanoPAD2 native map', () => {
     const parsed = parseMidiMapping({
       version: 1,
