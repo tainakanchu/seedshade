@@ -237,7 +237,7 @@ describe('loadBankStore / saveBankStore', () => {
 
   it('writes only version, current, and slots', () => {
     const storage = mapStorage();
-    expect(BANK_STORAGE_KEY).toBe('vj-deck-banks-v1');
+    expect(BANK_STORAGE_KEY).toBe('seedshade-deck-banks-v1');
     saveBankStore(storage, {
       version: 1,
       current: sampleSnapshot(),

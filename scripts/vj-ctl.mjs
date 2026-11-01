@@ -41,7 +41,7 @@ const IMAGE_MIME = {
 // room コマンドの既定 host。<account> はプレースホルダで、実際の host は
 // Cloudflare ダッシュボードの workers.dev サブドメイン、または独自ドメインを確認して
 // 差し替えること（--host で毎回上書きもできる）。
-const DEFAULT_ROOM_HOST = 'auto-audio-visualizer.<account>.workers.dev';
+const DEFAULT_ROOM_HOST = 'seedshade.<account>.workers.dev';
 
 /** 接続からコマンド完了までの全体上限。bridge も synth も無言のまま固まる場合の保険。 */
 const OVERALL_TIMEOUT_MS = 20_000;
@@ -116,8 +116,8 @@ room 専用オプション:
   node scripts/vj-ctl.mjs event add --cue drop --patch /tmp/patch.json --label "drop"
   node scripts/vj-ctl.mjs lock 60
   node scripts/vj-ctl.mjs record stop > recording.json
-  node scripts/vj-ctl.mjs room --host auto-audio-visualizer.example.workers.dev
-  node scripts/vj-ctl.mjs --url wss://auto-audio-visualizer.example.workers.dev/room/xxxx state`;
+  node scripts/vj-ctl.mjs room --host seedshade.example.workers.dev
+  node scripts/vj-ctl.mjs --url wss://seedshade.example.workers.dev/room/xxxx state`;
 
 /** 引数の誤り。main が usage を出して exit 1 にする。 */
 class UsageError extends Error {}

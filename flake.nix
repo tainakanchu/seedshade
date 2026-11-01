@@ -1,5 +1,5 @@
 {
-  description = "VJ Overlay Tool dev environment";
+  description = "Seedshade dev environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

@@ -2,7 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   // Cloudflare Workers Builds 側のプロジェクト名と一致させること。
   // ずれると Git 連携のビルドが「別の Worker へのデプロイ」になる。
-  "name": "auto-audio-visualizer",
+  "name": "seedshade",
   "main": "worker/index.ts",
   "compatibility_date": "2026-08-01",
 

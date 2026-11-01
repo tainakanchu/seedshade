@@ -10,7 +10,7 @@ import type { TransitionPresetId, VisualPatch } from '../synth/types';
 
 export type { TransitionPresetId };
 
-export const DECK_CHANNEL = 'vj-deck-v1';
+export const DECK_CHANNEL = 'seedshade-deck-v1';
 
 /** Deck → メイン窓の App レベル操作。Settings / AudioEngine / Timeline に触る。 */
 export type DeckCommand =

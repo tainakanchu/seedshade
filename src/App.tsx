@@ -126,10 +126,10 @@ export function App(): React.ReactElement {
       scenes.map((s) => s.id),
     );
     if (warning) {
-      console.warn(`[vj-overlay] ${warning}`);
+      console.warn(`[seedshade] ${warning}`);
     } else if (overlayId && !renderer.setOverlayScene(overlayId)) {
       console.warn(
-        `[vj-overlay] overlay "${overlayId}" を有効化できませんでした（WebGL2 非対応の可能性）。通常描画にフォールバックします。`,
+        `[seedshade] overlay "${overlayId}" を有効化できませんでした（WebGL2 非対応の可能性）。通常描画にフォールバックします。`,
       );
     }
 

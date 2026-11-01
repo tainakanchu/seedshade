@@ -75,7 +75,7 @@ function commandMsg(command: DeckCommand, id = 'cmd-1'): unknown {
 
 describe('DECK_CHANNEL', () => {
   it('is the v1 channel name', () => {
-    expect(DECK_CHANNEL).toBe('vj-deck-v1');
+    expect(DECK_CHANNEL).toBe('seedshade-deck-v1');
   });
 });
 

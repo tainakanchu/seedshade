@@ -5,7 +5,7 @@
 import type { DeckAction } from './actions';
 import { parseDeckCommand } from './protocol';
 
-export const MIDI_STORAGE_KEY = 'vj-deck-midi-v1';
+export const MIDI_STORAGE_KEY = 'seedshade-deck-midi-v1';
 
 export type MidiMessage =
   | { kind: 'noteOn'; ch: number; note: number; velocity: number }

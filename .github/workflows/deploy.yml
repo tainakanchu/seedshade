@@ -43,7 +43,7 @@ jobs:
         uses: actions/configure-pages@v5
 
       # プロジェクトサイトはサブパス配信なので base パスを渡してビルドする
-      # 例: https://<user>.github.io/auto-audio-visualizer-/
+      # 例: https://<user>.github.io/seedshade/
       - name: Build
         run: pnpm build
         env:
