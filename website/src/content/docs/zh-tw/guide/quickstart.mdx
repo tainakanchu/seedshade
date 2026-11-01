@@ -1,0 +1,99 @@
+---
+title: 快速開始
+description: 開啟應用程式、允許使用麥克風、讓畫面隨聲音反應並抽種子的最短步驟。
+---
+
+import { Steps, Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+最快的方式是直接開啟公開的應用程式（線上版）。不需要安裝。
+
+<Steps>
+
+1. **開啟應用程式**
+
+   用 Chrome 或 Edge 開啟 [https://seedshade.tainakanchu.com](https://seedshade.tainakanchu.com)。
+   左上角會出現寫著 `SEEDSHADE` 的控制面板，右上角則是 `Timeline` 面板。
+
+   如果顯示「WebGL2 が必要です」（需要 WebGL2），表示這個瀏覽器 / 電腦無法繪圖。
+   請參閱[疑難排解](../../troubleshooting/#出現webgl2-が必要です)。
+
+2. **允許使用麥克風（音訊輸入）**
+
+   開啟後，瀏覽器會立刻詢問是否允許使用音訊輸入。請選擇**允許**。
+
+   如果允許後仍沒有反應，或是沒有跳出對話框，請點一下面板上方的
+   **▶ Click to start audio** 按鈕。
+   面板右上角的顯示從 `idle` 變成 `live`，按鈕變成 **■ Stop audio**，就表示音訊輸入已經在運作。
+
+3. **選擇輸入裝置**
+
+   從面板的 **Input device** 選擇要使用的輸入（預設為 `System default`）。
+   裝置名稱會在允許權限之後才顯示。運作中切換的話，會直接改用新的裝置重新擷取。
+
+   想讓畫面直接對歌曲反應時，請選擇**回送**（把正在播放的聲音當作輸入擷取的虛擬裝置），而不是麥克風。
+   設定方式請參閱 [OBS・透明背景・桌面音訊](../../live/obs/#讓畫面對桌面音訊產生反應)。
+
+4. **調整音量**
+
+   播放音樂，確認面板的音量表與 `B` `M` `T`（低頻・中頻・高頻）的長條有在動。
+   音量表顯示的是**輸入本身（尚未套用 Gain）**的大小，單位為 dBFS。
+   目標是落在音量表上的亮色區段（-18 ～ -6 dBFS）內。
+
+   - 完全沒動並顯示 `NO SIGNAL`（低於約 -60 dBFS 持續 3 秒就會顯示） → 輸入裝置選錯，或是沒有聲音進來。
+   - `CLIP` 亮起 → 輸入已經飽和。請調低播放端或音訊介面的音量（調低 Gain 並不會讓它消失）。
+   - 畫面的反應太弱 / 太強 → 用 **Gain** 滑桿（0.5 ～ 4 倍，預設 1.5 倍）調整。
+     Gain 只作用於分析用的訊號，所以 `B` `M` `T` 的長條會改變，但音量表不會變。
+
+5. **抽種子（look gacha）**
+
+   按下面板 **Look** 那一列的 🎲 按鈕，或鍵盤的 **`R`**。
+   會產生像 `neon-tiger-042` 這樣的隨機種子，並以淡入淡出切換成完全不同的外觀。
+   遇到喜歡的外觀，只要記下顯示的種子字串，之後就能重現同樣的畫面。
+
+6. **切換成全螢幕並隱藏面板**
+
+   按 **`F`** 進入全螢幕，按 **`H`** 隱藏面板（控制面板與 Timeline 面板兩者）。
+   再按一次 `H` 就會恢復。
+
+</Steps>
+
+<Aside type="tip" title="做到這裡之後">
+  - 想保持同樣的「形狀」、只改變顏色與細節時，用 🧬 按鈕 / **`D`**（[種子](../seed/)）
+  - 想配合歌曲自動重抽種子，使用 **🎲 Auto-gacha**（[節拍同步](../tempo/)）
+  - 現場要一鍵切換 8 格變化版本，按 **`S`** 開啟 [Scene Deck](../../live/scene-deck/)
+</Aside>
+
+## 設定會自動儲存
+
+Gain・Hue・背景・Auto-gacha・輸入裝置・種子會自動儲存在瀏覽器（`localStorage`），下次開啟時仍維持原樣。
+也可以用 URL 指定啟動時的設定（[URL 參數](../../reference/url-params/)）。
+
+<Aside type="note">
+  儲存位置依瀏覽器與來源（URL 的網域）而各自獨立。線上版與在自己電腦上啟動的本機版（`localhost`）不會共用設定。
+</Aside>
+
+## 想在自己電腦上啟動
+
+如果想試用開發中的程式碼，或要使用本機的中繼（`pnpm bridge`），請 clone 儲存庫後啟動。
+
+<Tabs>
+<TabItem label="在本機啟動">
+
+```bash
+git clone https://github.com/tainakanchu/seedshade.git
+cd seedshade
+pnpm install
+pnpm dev
+```
+
+開啟顯示出來的 URL（通常是 `https://localhost:5173/`）。開發伺服器會以自簽憑證的 **HTTPS** 啟動，
+所以第一次會出現瀏覽器的警告。請點選「進階」→「繼續前往」。
+
+</TabItem>
+<TabItem label="與線上版的差異">
+
+繪圖、面板、Timeline、Scene Deck、MIDI 在兩邊的用法都一樣。
+差別在於從 CLI / AI 操控時的連線方式。詳情請參閱[線上版與本機版](../../reference/hosted-vs-local/)。
+
+</TabItem>
+</Tabs>

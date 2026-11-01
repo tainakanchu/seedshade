@@ -1,0 +1,119 @@
+---
+title: Remote control & multiple screens
+description: Control from another PC or the CLI through a room (Cloudflare relay) or bridge (local relay), and show on multiple screens with mirror.
+---
+
+import { Steps, Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+Seedshade's visuals can be controlled from the terminal of another PC, or from an AI (via the CLI).
+The main window connects to a relay server over WebSocket, and the CLI (`vj-ctl` and others) sends commands to that relay.
+
+| Relay | URL to use | Where the relay runs | Best for |
+| --- | --- | --- | --- |
+| **room** | `?room=<id>` | The hosted version's Worker (`/room/<id>`) | Using the hosted version. Works from another PC or another network |
+| **bridge** | `?bridge=1` | `pnpm bridge` on your own PC (`127.0.0.1:7877`) | Using the local version (`pnpm dev`). Same PC only |
+
+If the URL has neither `room` nor `bridge`, the main window does not connect to any relay (so there is no risk of it being controlled unexpectedly during a show).
+
+<Aside type="caution">
+  **`?bridge=1` cannot be used with the hosted version.** The local relay (`pnpm bridge`) rejects connections from pages opened from anything other than `localhost` / `127.0.0.1`.
+  To control the hosted version, use `?room=`. See [Hosted vs. local](../../reference/hosted-vs-local/) for details.
+</Aside>
+
+## Controlling via room (hosted version)
+
+The CLI is in the repository, so set up the repository on the controlling PC (Node.js 24 and pnpm are required).
+
+<Steps>
+
+1. **Set up the repository**
+
+   ```bash
+   git clone https://github.com/tainakanchu/seedshade.git
+   cd seedshade
+   pnpm install
+   ```
+
+2. **Create a room** (no network traffic; it only generates a random shared key)
+
+   ```bash
+   node scripts/vj-ctl.mjs room --host seedshade.tainakanchu.com
+   ```
+
+   It prints `room` (the id), `pageUrl`, and `ctlArgs` as JSON.
+
+   :::caution
+   Always include `--host`. If omitted, the URL is built with a placeholder hostname like `seedshade.<account>.workers.dev`, which does not work as is.
+   :::
+
+3. **Open `pageUrl` on the output PC**
+
+   The URL has the form `https://seedshade.tainakanchu.com/?room=<id>`. You may add other parameters such as `ui=hide`.
+
+4. **Confirm it is connected**
+
+   ```bash
+   node scripts/vj-ctl.mjs --url wss://seedshade.tainakanchu.com/room/<id> state
+   ```
+
+   If JSON comes back, you are ready. Add the same `--url` to every command from here on (you can use `ctlArgs` as is).
+
+</Steps>
+
+- `{"error":"no synth connected"}` … one of: the page is not open, `?room=` is missing, or the room id is wrong.
+- The room id is a **shared key with no authentication**. Anyone who knows the URL can control the visuals, so do not post it in public places, and create a new one for each show.
+- A room id is 8 to 64 characters of alphanumerics, `_`, and `-`. An id with a different form will not connect.
+
+## Controlling via bridge (local version)
+
+<Steps>
+
+1. Start the local version (`pnpm dev`).
+2. In another terminal, start the relay and leave it running.
+
+   ```bash
+   pnpm bridge
+   ```
+
+   If you see `vj-bridge listening on ws://127.0.0.1:7877 ...`, it is OK.
+3. Open `https://localhost:5173/?bridge=1` in the browser.
+4. Check with `node scripts/vj-ctl.mjs state` (the local relay is the default target, so `--url` is not needed).
+
+</Steps>
+
+- The relay listens only on `127.0.0.1` (it has no authentication, so it is not exposed to the LAN). Therefore it can only be used **within the same PC**.
+- To change the port, use `pnpm bridge --port 7878`, `?bridge=7878` for the page, and `--port 7878` for the CLI.
+- `vj:gen` / `vj:tweak` / `vj:recipe` require a connection target, so add `--url ws://127.0.0.1:7877` ([How it works & connecting](../../ai/overview/)).
+
+## mirror: showing on multiple screens
+
+You can connect any number of display-only **mirror** screens to the same room (or bridge).
+
+| Role | URL | Count |
+| --- | --- | --- |
+| Main (responds to commands) | `?room=<id>` | **Only one** |
+| mirror (display only) | `?room=<id>&mirror=1` | Any number |
+
+Commands sent from the CLI reach the main and all mirrors at the same time. Mirrors do not send responses, so the main answers queries such as `state`.
+
+<Aside type="caution" title="mirror only keeps CLI commands in sync">
+  What reaches a mirror is only commands from the CLI (the relay). The following are **separate on each screen**, so the picture can drift between screens.
+
+  - Key and panel operations in the main window (`R` / `D`, seed input, Auto-gacha, etc.)
+  - Scene Deck triggers (the Deck only reaches a main window in the same browser)
+  - Audio input (each screen reacts to its own input)
+  - The seed at the time of opening (the settings saved in each browser)
+
+  To keep multiple screens on the same picture, route operations through the CLI and open every screen with the same `?seed=`.
+</Aside>
+
+<Aside type="danger" title="Do not open two mains">
+  If you open the same room twice without `mirror=1`, the newer one becomes the main and the older one is disconnected.
+  The older one reconnects automatically every 3 seconds, so the two mains keep swapping places.
+  Always add `mirror=1` to anything other than the main.
+</Aside>
+
+## Opening the local version from another LAN device
+
+`pnpm dev` is also exposed to the LAN, so another device on the same network can open `https://<the PC's IP address>:5173/` (proceed past the self-signed certificate warning via "Advanced" → "Proceed to ...").
+However, `?bridge=1` cannot be used from that device (bridge looks at that device's own `127.0.0.1`). To control from another device, use the hosted version with `?room=`.

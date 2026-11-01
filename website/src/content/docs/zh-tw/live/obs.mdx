@@ -1,0 +1,83 @@
+---
+title: OBS・透明背景・桌面音訊
+description: 在 OBS 的瀏覽器來源中當作透明疊加層使用的方法，以及讓畫面對播放中的歌曲產生反應的方法。
+---
+
+import { Steps, Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+## 在 OBS 的瀏覽器來源中使用
+
+<Steps>
+
+1. 在 OBS 選擇**來源 → 新增 → 瀏覽器**。
+2. 在 **URL** 填入 Seedshade 的網址。若要當作疊加層使用，建議使用透明背景並隱藏面板。
+
+   ```
+   https://seedshade.tainakanchu.com/?bg=transparent&ui=hide
+   ```
+
+   想固定外觀的話可以加上 `&seed=<種子>`，反應強度則可以像 `&gain=2` 這樣加上去（[URL 參數](../../reference/url-params/)）。
+3. 將**寬度 / 高度**調整成輸出解析度（例：1920 × 1080）。
+4. 只要加上 `bg=transparent`，背景就會維持透明，可以疊在其他來源上方。
+
+</Steps>
+
+<Aside type="caution" title="瀏覽器來源可能擷取不到聲音">
+  Seedshade 是在頁面中用 `getUserMedia`（瀏覽器的音訊輸入）來分析聲音。這與 OBS 的「透過 OBS 控制頁面音訊」無關。
+  OBS 的瀏覽器來源不會像一般瀏覽器那樣跳出麥克風權限對話框，因此視環境而定，可能取不到音訊輸入，使畫面不會對聲音反應。
+
+  遇到這種情況，請採用下列任一種方式。
+
+  - **用一般瀏覽器開啟 Seedshade，再用 OBS 的「視窗擷取」把它抓進來**（無法使用透明背景，所以維持黑色背景，以「色度去背」或「混合模式：相加 / 濾色」來疊合）。
+  - 透過 OBS 的啟動選項等方式，啟用瀏覽器來源的媒體權限（這是 OBS 端的設定，並非 Seedshade 的功能。實際行為取決於 OBS 的版本與作業系統）。
+</Aside>
+
+<Aside type="tip">
+  如果需要在瀏覽器來源中按 **▶ Click to start audio**，可以在 OBS 對來源按右鍵 → 開啟**互動**，操作面板（在 `?ui=hide` 的情況下，於互動視窗內按 `H` 就會顯示面板）。
+</Aside>
+
+## 關於透明背景
+
+- 背景可用 **Background** 的 `Black` / `Transparent`、鍵盤的 **`B`**，或 URL 的 `?bg=transparent` 切換。
+- 設為透明後，繪圖結果也會帶著 alpha 輸出。沒有畫東西的部分會透出下方的內容。
+- 生成的畫面依 Patch 不同，有「填滿畫面」和「留白很多」兩種。若用於疊加層，把留白多的畫面所對應的種子記下來會比較好用。
+
+## 讓畫面對桌面音訊產生反應
+
+瀏覽器的音訊輸入在預設狀態下只會擷取麥克風的聲音。要讓畫面對電腦正在播放的歌曲或 DAW 的聲音產生反應，需要建立**回送（虛擬音訊裝置）**，並在 Seedshade 的 **Input device** 中選擇它。
+
+<Tabs>
+<TabItem label="Windows">
+
+安裝 [VB-CABLE](https://vb-audio.com/Cable/) 之類的虛擬音訊裝置。
+
+1. 將發出聲音的應用程式（或 Windows 的預設播放裝置）的輸出目的地設為 **CABLE Input**。
+2. 在 Seedshade 的 **Input device** 選擇 **CABLE Output**。
+3. 如果自己也想聽到聲音，可以在 Windows 的音效設定中對 CABLE Output 使用「聆聽此裝置」等方式，讓聲音也從喇叭播出。
+
+</TabItem>
+<TabItem label="macOS">
+
+安裝 [BlackHole](https://existential.audio/blackhole/) 或 Loopback 之類的工具。
+
+1. 在「音訊 MIDI 設定」中建立一個包含喇叭與 BlackHole 的「多重輸出裝置」，並設為播放目的地。
+2. 在 Seedshade 的 **Input device** 選擇 **BlackHole**。
+
+</TabItem>
+<TabItem label="Linux">
+
+在 PulseAudio / PipeWire 中，輸出裝置的 **Monitor**（例：`Monitor of ...`）會以輸入的形式出現。
+在 Seedshade 的 **Input device** 中選擇它，就能擷取桌面的聲音。
+
+</TabItem>
+</Tabs>
+
+<Aside type="note">
+  Seedshade 擷取音訊輸入時，會把回音消除、雜訊抑制、自動增益全部關閉。線路輸入的聲音會原封不動地被分析。
+  輸入裝置的清單，會在允許一次音訊輸入之後，才連同裝置名稱一起顯示。插拔裝置時清單會自動更新。
+</Aside>
+
+## 使用 DJ 混音器的聲音
+
+在現場，最可靠的做法是把 DJ 混音器的 Booth 輸出或 REC 輸出接到音訊介面的線路輸入，再於 **Input device** 選擇該輸入。
+音量方面，請在混音器或音訊介面端調整，讓面板的音量表落在目標區段（-18 ～ -6 dBFS）內。

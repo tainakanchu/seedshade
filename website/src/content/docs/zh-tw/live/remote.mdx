@@ -1,0 +1,118 @@
+---
+title: 遠端操作與多螢幕
+description: 透過 room（Cloudflare 的中繼）或 bridge（本機中繼），從其他電腦或 CLI 操作。用 mirror 輸出到多個螢幕。
+---
+
+import { Steps, Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+Seedshade 的畫面可以從其他電腦的終端機或 AI（CLI）操作。
+運作方式是：主視窗以 WebSocket 連到中繼伺服器，CLI（`vj-ctl` 等）再把指令送到那個中繼。
+
+| 中繼 | 使用的 URL | 中繼的位置 | 適用情境 |
+| --- | --- | --- | --- |
+| **room** | `?room=<id>` | 線上版的 Worker（`/room/<id>`） | 使用線上版時。即使從其他電腦、其他網路也能操作 |
+| **bridge** | `?bridge=1` | 自己電腦上的 `pnpm bridge`（`127.0.0.1:7877`） | 使用本機版（`pnpm dev`）時。僅限同一台電腦內 |
+
+如果 URL 沒有加上 `room` 或 `bridge`，主視窗就完全不會連到中繼（不用擔心演出中被擅自操作）。
+
+<Aside type="caution">
+  **線上版無法使用 `?bridge=1`。** 本機中繼（`pnpm bridge`）會拒絕從 `localhost` / `127.0.0.1` 以外開啟的頁面連線。
+  想從線上版操作時，請使用 `?room=`。詳情請見[線上版與本機版](../../reference/hosted-vs-local/)。
+</Aside>
+
+## 用 room（線上版）操作
+
+CLI 包含在儲存庫中，所以請在操作端的電腦準備好儲存庫（需要 Node.js 24 與 pnpm）。
+
+<Steps>
+
+1. **準備儲存庫**
+
+   ```bash
+   git clone https://github.com/tainakanchu/seedshade.git
+   cd seedshade
+   pnpm install
+   ```
+
+2. **建立 room**（不會進行通訊，只是產生一組隨機的金鑰）
+
+   ```bash
+   node scripts/vj-ctl.mjs room --host seedshade.tainakanchu.com
+   ```
+
+   會以 JSON 顯示 `room`（id）、`pageUrl`、`ctlArgs`。
+
+   :::caution
+   一定要加上 `--host`。省略的話，會以 `seedshade.<account>.workers.dev` 這個暫時的主機名稱產生 URL，無法直接使用。
+   :::
+
+3. **在輸出用的電腦開啟 `pageUrl`**
+
+   形式為 `https://seedshade.tainakanchu.com/?room=<id>` 的 URL。也可以再加上 `ui=hide` 等其他參數。
+
+4. **確認是否已連線**
+
+   ```bash
+   node scripts/vj-ctl.mjs --url wss://seedshade.tainakanchu.com/room/<id> state
+   ```
+
+   只要回傳 JSON 就準備完成了。之後的所有指令都要加上同樣的 `--url`（可以直接使用 `ctlArgs`）。
+
+</Steps>
+
+- `{"error":"no synth connected"}` … 原因是下列其中之一：頁面沒有開啟、沒有加上 `?room=`、room id 不對。
+- room id 是**沒有驗證機制的金鑰**。知道 URL 的人都能操作畫面，所以請不要貼在公開的地方，並且每次演出都重新建立。
+- room id 為 8～64 個英數字元、`_`、`-`。格式不符的 id 不會連線。
+
+## 用 bridge（本機版）操作
+
+<Steps>
+
+1. 啟動本機版（`pnpm dev`）。
+2. 在另一個終端機啟動中繼，並讓它持續運行。
+
+   ```bash
+   pnpm bridge
+   ```
+
+   出現 `vj-bridge listening on ws://127.0.0.1:7877 ...` 就沒問題。
+3. 在瀏覽器開啟 `https://localhost:5173/?bridge=1`。
+4. 用 `node scripts/vj-ctl.mjs state` 確認（本機中繼是預設的連線目的地，所以不需要 `--url`）。
+
+</Steps>
+
+- 中繼只會在 `127.0.0.1` 上監聽（因為沒有驗證機制，所以不對區域網路開放）。因此只能在**同一台電腦內**使用。
+- 要更改連接埠時，請讓 `pnpm bridge --port 7878`、頁面的 `?bridge=7878`、CLI 的 `--port 7878` 保持一致。
+- `vj:gen` / `vj:tweak` / `vj:recipe` 必須指定連線目的地，所以要加上 `--url ws://127.0.0.1:7877`（[原理與連線](../../ai/overview/)）。
+
+## mirror：輸出到多個螢幕
+
+可以讓任意數量的裝置，以僅供顯示的 **mirror** 身分連到同一個 room（或 bridge）。
+
+| 角色 | URL | 數量 |
+| --- | --- | --- |
+| 主要（回應指令） | `?room=<id>` | **僅限 1 台** |
+| mirror（僅供顯示） | `?room=<id>&mirror=1` | 任意數量 |
+
+從 CLI 送出的指令會同時送達主要與所有 mirror。mirror 不會回傳回應，所以 `state` 等查詢是由主要來回答。
+
+<Aside type="caution" title="mirror 只會同步「CLI 的指令」">
+  送達 mirror 的只有來自 CLI（中繼）的指令。下列項目在**每個螢幕上各自獨立**，所以各螢幕的畫面可能會有落差。
+
+  - 主視窗的按鍵操作、面板操作（`R` / `D`、種子輸入、Auto-gacha 等）
+  - Scene Deck 的一鍵切換（Deck 只會傳到同一個瀏覽器內的主視窗）
+  - 音訊輸入（每個螢幕都以各自的輸入來反應）
+  - 開啟當下的種子（各瀏覽器所儲存的設定）
+
+  想讓多個螢幕保持相同畫面時，請把操作集中到 CLI，並以相同的 `?seed=` 開啟各個螢幕。
+</Aside>
+
+<Aside type="danger" title="不要開 2 個主要視窗">
+  如果沒有加上 `mirror=1` 就開啟 2 個相同的 room，新的那個會成為主要，舊的則會被中斷連線。
+  舊的那個每 3 秒會自動重新連線，結果就會變成 2 個主要視窗不斷交替。除了主要之外，一定要加上 `mirror=1`。
+</Aside>
+
+## 從區域網路內的其他裝置開啟本機版
+
+`pnpm dev` 也會對區域網路公開，所以同一個網路中的其他裝置可以用 `https://<電腦的 IP 位址>:5173/` 開啟（自簽憑證的警告，請點選「進階」→「繼續前往」）。
+不過，那台裝置無法使用 `?bridge=1`（因為 bridge 會去連那台裝置自己的 `127.0.0.1`）。想從其他裝置操作時，請使用線上版搭配 `?room=`。
