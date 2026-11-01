@@ -8,7 +8,7 @@ import type { TransitionPresetId, VisualPatch } from '../synth/types';
 import { validatePatch } from '../synth/validate';
 import type { AutoKind, AutoOrder } from './autoAdvance';
 
-export const BANK_STORAGE_KEY = 'vj-deck-banks-v1';
+export const BANK_STORAGE_KEY = 'seedshade-deck-banks-v1';
 
 export type BankSlotId = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
 

@@ -224,7 +224,7 @@ export function ControlPanel(props: ControlPanelProps): React.ReactElement {
   return (
     <div className={className}>
       <div className="panel-header">
-        <span className="panel-title">VJ OVERLAY</span>
+        <span className="panel-title">SEEDSHADE</span>
         <span className="panel-sub">{running ? 'live' : 'idle'}</span>
       </div>
 

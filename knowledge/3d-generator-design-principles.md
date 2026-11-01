@@ -7,7 +7,7 @@ status: stable
 generated: { by: claude-code/2.1.258+claude-sonnet-5, at: "2026-09-02T19:08:57Z" }
 sources:
   - id: pr-35
-    resource: https://github.com/tainakanchu/auto-audio-visualizer-/pull/35
+    resource: https://github.com/tainakanchu/seedshade/pull/35
     title: 'feat(synth): 3D (SDF レイマーチ) Generator を追加する'
     last_modified: "2026-08-06"
   - id: sdf-cube

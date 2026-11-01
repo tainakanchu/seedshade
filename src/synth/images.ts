@@ -32,7 +32,7 @@
 /** Long edge, in px, an SVG is rasterized to. */
 export const SVG_RASTER_SIZE = 2048;
 
-const DB_NAME = 'vj-images';
+const DB_NAME = 'seedshade-images';
 const DB_VERSION = 1;
 const STORE = 'images';
 

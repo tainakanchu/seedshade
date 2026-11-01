@@ -7,7 +7,7 @@ status: stable
 generated: { by: claude-code/2.1.258+claude-sonnet-5, at: "2026-09-02T19:08:57Z" }
 sources:
   - id: pr-64
-    resource: https://github.com/tainakanchu/auto-audio-visualizer-/pull/64
+    resource: https://github.com/tainakanchu/seedshade/pull/64
     title: 'feat(deck): バンクの保存と復元'
     last_modified: "2026-09-02"
   - id: commit-a69c838

@@ -30,7 +30,7 @@ export interface Settings {
   seed: string;
 }
 
-const STORAGE_KEY = 'vj-overlay-settings';
+const STORAGE_KEY = 'seedshade-settings';
 
 /** Maximum length a seed string is kept to (sanitized). */
 const SEED_MAX_LEN = 64;

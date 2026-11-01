@@ -1,4 +1,4 @@
-# VJ Overlay Tool
+# Seedshade
 
 ブラウザだけで動く、音に反応するフルスクリーン・ビジュアルツールです。マイク / ライン入力 / ループバック（デスクトップ音声）を解析し、なめらかで音楽に反応するビジュアルを描画します。OBS のブラウザソースや、プロジェクター用のフルスクリーンブラウザに常駐させて使う前提で設計しています。
 
@@ -143,7 +143,7 @@ Generator の大半は音の uniform を読まないので、**画面全体に�
 
 ## Scene Deck（別窓ポン出し）
 
-Resolume のシーン一覧のように、**別窓で 8 スロットのバリエーションをポン出し**できます。メイン窓（semantic-synth）のいまの Patch をベースに、同じ Generator 構成のままパラメータ違いを 8 面自動生成し、キーボードで即遷移させます。通信は同一オリジンの **BroadcastChannel**（`vj-deck-v1`）だけで、`pnpm bridge` も `?bridge=1` も不要です。
+Resolume のシーン一覧のように、**別窓で 8 スロットのバリエーションをポン出し**できます。メイン窓（semantic-synth）のいまの Patch をベースに、同じ Generator 構成のままパラメータ違いを 8 面自動生成し、キーボードで即遷移させます。通信は同一オリジンの **BroadcastChannel**（`seedshade-deck-v1`）だけで、`pnpm bridge` も `?bridge=1` も不要です。
 
 デッキ窓では AudioEngine / Renderer は起動しません（マイク許可プロンプトも、常時の GPU 負荷も無し）。メイン窓をプロジェクター出力、Deck を手元の操作卓にする運用を想定しています。
 
@@ -213,7 +213,7 @@ Scene Deck 窓だけで Web MIDI を受けます（メイン窓には載せま�
 1. Deck の MIDI パネルで **MIDI** を押す。権限は **2 段**（MIDI 本体と SysEx）。両方許可する
 2. nanoPAD2 は SysEx の **Search Device**（Family ID `12 01`）で確定し、**Native KORG Mode** に入る。`native` バッジが出る。入れなければ Current Scene Data Dump でパッドの Note# からマップを自動生成する
 3. **learn** を ON にし、割り当てたい action を選んでパッド / CC を叩く（nanoPAD2 以外、または Native を使わない場合）。同じトリガーが既にあれば上書き（警告）。`Esc` で learn 終了。learn 中もキーボードのパッドは使える
-4. マッピングは `localStorage` キー `vj-deck-midi-v1`（`{ activeMapping, nanopad: { preferNative, swapRows } }`）。JSON 書き出し / 読み込みで別 PC へ持てる
+4. マッピングは `localStorage` キー `seedshade-deck-midi-v1`（`{ activeMapping, nanopad: { preferNative, swapRows } }`）。JSON 書き出し / 読み込みで別 PC へ持てる
 
 **Native mode の in / out**: 接続時に Native In、Deck 窓を閉じる（またはリロードする）ときに Native Out を送る。送らないと nanoPAD2 が Native のまま残り、他アプリで普段のノートが出なくなる。戻らなければ **USB を抜くか電源再投入**。
 
@@ -234,10 +234,10 @@ Scene Deck 窓だけで Web MIDI を受けます（メイン窓には載せま�
 
 バンク（BASE + V1…V7）は **base Patch と bankSeed** だけを保存します。8 面そのものは持たず、同じ入力なら `buildSceneBank` が同じ手札を再生成します。
 
-- **自動保存**: バンク / seed / トランジション / auto / カーソルが変わるたびに 500ms debounce で `localStorage` キー `vj-deck-banks-v1` の `current` を更新する（クラッシュ耐性）。Deck 起動時に `current` があれば **メイン窓の currentPatch を待たずに** 復元する。未保存なら従来どおり live から生成する
+- **自動保存**: バンク / seed / トランジション / auto / カーソルが変わるたびに 500ms debounce で `localStorage` キー `seedshade-deck-banks-v1` の `current` を更新する（クラッシュ耐性）。Deck 起動時に `current` があれば **メイン窓の currentPatch を待たずに** 復元する。未保存なら従来どおり live から生成する
 - **A〜H**: ツールバーの小ボタン。クリックで呼び出し、`Shift+クリック` で保存（上書き確認なし）。空は薄く表示。右クリック / 長押しで名前を編集。呼び出しはバンクを差し替えるだけで **pad は自動では叩かない**し **`seed:set` も送らない**（live の画は pad 1 などを押すまで変わらない）。menu の **seed を採用** を押すと `seed:set` が送られ、Settings.seed とメインの画の両方が作り直される
 - **JSON**: `JSON copy` でいまのスナップショットをクリップボードへ。`menu` 内のテキストエリアに貼って `JSON paste`。別 PC・別ブラウザへ持てる
-- **別 PC では画像が欠ける**: Patch は画像の hash 参照だけを持ち、ピクセルは同一オリジンの IndexedDB `vj-images` にある。別マシンへ JSON だけ持っていくとサンプラーは透明ダミーになる（スロットはラベルと detail で判別できる）
+- **別 PC では画像が欠ける**: Patch は画像の hash 参照だけを持ち、ピクセルは同一オリジンの IndexedDB `seedshade-images` にある。別マシンへ JSON だけ持っていくとサンプラーは透明ダミーになる（スロットはラベルと detail で判別できる）
 - **STALE**: 復元した base が現行 catalog で invalid（generatorVersion の更新など）。バンクはフォールバック（バリエーションが全部 BASE 相当）で出すので落ちない。`R` で live から取り直す
 - **クリア**: menu 内の `clear current` → `confirm clear current`（2 段）。次回起動は live から生成する。A〜H は消さない
 

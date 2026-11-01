@@ -1,7 +1,7 @@
 import type { Env } from './env';
 
 /**
- * VJ Overlay Tool を Cloudflare Worker 1 つで配る。
+ * Seedshade を Cloudflare Worker 1 つで配る。
  *
  * この Worker がやることは 2 つだけ:
  *   1. `/room/<id>` の WebSocket Upgrade を、その room の Durable Object へ渡す
