@@ -217,9 +217,7 @@ wss.on('connection', (socket) => {
 });
 
 wss.on('listening', () => {
-  console.log(
-    `vj-bridge listening on ws://127.0.0.1:${port}  (open the app with ?scene=semantic-synth&bridge=1)`,
-  );
+  console.log(`vj-bridge listening on ws://127.0.0.1:${port}  (open the app with ?bridge=1)`);
 });
 
 wss.on('error', (err) => {

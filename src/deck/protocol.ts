@@ -18,16 +18,13 @@ export type DeckCommand =
   /** Settings.seed のみ。画は変えない（derivePatch は seed:gacha）。 */
   | { kind: 'seed:set'; seed: string }
   | { kind: 'patch:rerollDetails'; seed?: string }
-  | { kind: 'scene:set'; sceneId: string }
-  | { kind: 'scene:shift'; delta: 1 | -1 }
   | { kind: 'hue:mode'; mode: 'cycle' | 'fixed' }
   | { kind: 'hue:fixed'; hue: number }
   | { kind: 'background:set'; background: 'black' | 'transparent' }
   | { kind: 'tempo:tap' }
   | { kind: 'tempo:multiply'; factor: 2 | 0.5 }
   | { kind: 'tempo:auto' }
-  | { kind: 'timeline:lock'; seconds: number }
-  | { kind: 'autoCycle:set'; on: boolean };
+  | { kind: 'timeline:lock'; seconds: number };
 
 /** デッキ窓 → メイン窓 */
 export type DeckRequest =
@@ -42,7 +39,6 @@ export type DeckResponse =
   | { kind: 'deck:commandResult'; id: string; ok: boolean; issues: string[] };
 
 export interface DeckAppState {
-  sceneId: string;
   hueMode: 'cycle' | 'fixed';
   fixedHue: number;
   /**
@@ -52,7 +48,6 @@ export interface DeckAppState {
   baseHue: number;
   background: 'black' | 'transparent';
   seed: string;
-  autoCycle: boolean;
   /** 0 = 未検出 */
   bpm: number;
   tempoLocked: boolean;
@@ -80,7 +75,7 @@ export interface DeckSharedState {
  * URL の query からデッキ窓モードかどうかを決める。
  *
  * `deck=1` / `deck=true` だけを true にする。`?deck`（値なし）や不正値は false。
- * autocycle / mirror と同じ作法。
+ * mirror と同じ作法。
  */
 export function parseDeckMode(search: string): boolean {
   let raw: string | null;
@@ -148,12 +143,6 @@ export function parseDeckCommand(input: unknown): DeckCommand | null {
       if (typeof input.seed !== 'string') return null;
       return { kind: 'patch:rerollDetails', seed: input.seed };
     }
-    case 'scene:set':
-      if (typeof input.sceneId !== 'string') return null;
-      return { kind: 'scene:set', sceneId: input.sceneId };
-    case 'scene:shift':
-      if (input.delta !== 1 && input.delta !== -1) return null;
-      return { kind: 'scene:shift', delta: input.delta };
     case 'hue:mode':
       if (input.mode !== 'cycle' && input.mode !== 'fixed') return null;
       return { kind: 'hue:mode', mode: input.mode };
@@ -175,9 +164,6 @@ export function parseDeckCommand(input: unknown): DeckCommand | null {
     case 'timeline:lock':
       if (!isFiniteNumber(input.seconds) || input.seconds < 0) return null;
       return { kind: 'timeline:lock', seconds: input.seconds };
-    case 'autoCycle:set':
-      if (typeof input.on !== 'boolean') return null;
-      return { kind: 'autoCycle:set', on: input.on };
     default:
       return null;
   }
@@ -230,7 +216,6 @@ function parseSharedState(input: unknown): DeckSharedState | null {
 
 function parseAppState(input: unknown): DeckAppState | null {
   if (!isRecord(input)) return null;
-  if (typeof input.sceneId !== 'string') return null;
   if (input.hueMode !== 'cycle' && input.hueMode !== 'fixed') return null;
   if (!isFiniteNumber(input.fixedHue)) return null;
   // 旧 host は baseHue を送らない。無いときは fixedHue に倒す。
@@ -244,18 +229,15 @@ function parseAppState(input: unknown): DeckAppState | null {
   }
   if (input.background !== 'black' && input.background !== 'transparent') return null;
   if (typeof input.seed !== 'string') return null;
-  if (typeof input.autoCycle !== 'boolean') return null;
   if (!isFiniteNumber(input.bpm)) return null;
   if (typeof input.tempoLocked !== 'boolean') return null;
   if (typeof input.audioRunning !== 'boolean') return null;
   return {
-    sceneId: input.sceneId,
     hueMode: input.hueMode,
     fixedHue: input.fixedHue,
     baseHue,
     background: input.background,
     seed: input.seed,
-    autoCycle: input.autoCycle,
     bpm: input.bpm,
     tempoLocked: input.tempoLocked,
     audioRunning: input.audioRunning,

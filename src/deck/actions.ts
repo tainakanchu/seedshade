@@ -1,7 +1,7 @@
 /**
  * Scene Deck の操作をキー / ボタン / MIDI から同じ経路に乗せる。
  *
- * keyToAction は純関数。トグル系（hue / bg / lock / autoCycle）だけは
+ * keyToAction は純関数。トグル系（hue / bg / lock）だけは
  * 現在の App 表示が要るので第 2 引数を見る。無い（旧 host）ときは null。
  */
 import type { DeckCommand } from './protocol';
@@ -26,7 +26,6 @@ export interface DeckKeyView {
   /** レンダラの base hue（offset 未適用）。fixed に入るとき固定値にする。 */
   hue: number;
   background: 'black' | 'transparent';
-  autoCycle: boolean;
   locked: boolean;
 }
 
@@ -68,13 +67,6 @@ export function keyToAction(e: KeyboardEvent, view?: DeckKeyView | null): DeckAc
     e.code === 'ArrowUp' ||
     e.code === 'ArrowDown'
   ) {
-    // Shift+←→ はシーン送り。カーソルは動かさない。
-    if (e.shiftKey && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
-      return {
-        type: 'command',
-        command: { kind: 'scene:shift', delta: e.code === 'ArrowRight' ? 1 : -1 },
-      };
-    }
     return { type: 'cursor', dir: CURSOR_BY_CODE[e.code] };
   }
 
@@ -134,10 +126,8 @@ export function keyToAction(e: KeyboardEvent, view?: DeckKeyView | null): DeckAc
       };
     }
     case 'KeyA':
-      if (e.shiftKey) {
-        if (e.repeat || !view) return null;
-        return { type: 'command', command: { kind: 'autoCycle:set', on: !view.autoCycle } };
-      }
+      // Shift+A は旧「シーン自動送り」の割り当て。意味が変わらないよう無効にしておく。
+      if (e.shiftKey) return null;
       return { type: 'auto.toggle' };
     case 'KeyM':
       return { type: 'auto.mode' };

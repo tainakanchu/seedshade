@@ -55,13 +55,11 @@ function sampleState(overrides: Partial<DeckSharedState> = {}): DeckSharedState 
 
 function sampleApp(overrides: Partial<DeckAppState> = {}): DeckAppState {
   return {
-    sceneId: 'semantic-synth',
     hueMode: 'cycle',
     fixedHue: 200,
     baseHue: 180,
     background: 'black',
     seed: 'neon-prism-001',
-    autoCycle: false,
     bpm: 128,
     tempoLocked: true,
     audioRunning: true,
@@ -82,7 +80,7 @@ describe('DECK_CHANNEL', () => {
 describe('parseDeckMode', () => {
   it('returns false when the parameter is absent', () => {
     expect(parseDeckMode('')).toBe(false);
-    expect(parseDeckMode('?scene=semantic-synth&bridge=1')).toBe(false);
+    expect(parseDeckMode('?bridge=1')).toBe(false);
   });
 
   it('returns false for empty or non-enable values', () => {
@@ -162,9 +160,6 @@ describe('parseDeckRequest', () => {
       { kind: 'seed:set', seed: 'neon-tiger-042' },
       { kind: 'patch:rerollDetails' },
       { kind: 'patch:rerollDetails', seed: 'neon-tiger-042' },
-      { kind: 'scene:set', sceneId: 'bars' },
-      { kind: 'scene:shift', delta: 1 },
-      { kind: 'scene:shift', delta: -1 },
       { kind: 'hue:mode', mode: 'cycle' },
       { kind: 'hue:mode', mode: 'fixed' },
       { kind: 'hue:fixed', hue: 0 },
@@ -178,8 +173,6 @@ describe('parseDeckRequest', () => {
       { kind: 'tempo:auto' },
       { kind: 'timeline:lock', seconds: 0 },
       { kind: 'timeline:lock', seconds: 30 },
-      { kind: 'autoCycle:set', on: true },
-      { kind: 'autoCycle:set', on: false },
     ];
     for (const command of goods) {
       expect(parseDeckRequest(commandMsg(command))).toEqual({
@@ -208,11 +201,10 @@ describe('parseDeckRequest', () => {
       { kind: 'seed:set' },
       { kind: 'seed:set', seed: 12 },
       { kind: 'patch:rerollDetails', seed: 12 },
-      { kind: 'scene:set' },
-      { kind: 'scene:set', sceneId: 0 },
-      { kind: 'scene:shift', delta: 0 },
-      { kind: 'scene:shift', delta: 2 },
-      { kind: 'scene:shift', delta: '1' },
+      // 旧バージョンのデッキが送りうる、廃止済みコマンド。
+      { kind: 'scene:set', sceneId: 'semantic-synth' },
+      { kind: 'scene:shift', delta: 1 },
+      { kind: 'autoCycle:set', on: true },
       { kind: 'hue:mode', mode: 'rainbow' },
       { kind: 'hue:mode' },
       { kind: 'hue:fixed', hue: Number.NaN },
@@ -228,9 +220,6 @@ describe('parseDeckRequest', () => {
       { kind: 'timeline:lock', seconds: Number.POSITIVE_INFINITY },
       { kind: 'timeline:lock', seconds: -1 },
       { kind: 'timeline:lock' },
-      { kind: 'autoCycle:set', on: 1 },
-      { kind: 'autoCycle:set', on: 'true' },
-      { kind: 'autoCycle:set' },
     ];
     for (const command of bads) {
       expect(parseDeckRequest(commandMsg(command as DeckCommand))).toBeNull();
@@ -416,12 +405,10 @@ describe('parseDeckResponse', () => {
   it('defaults missing baseHue to fixedHue (legacy host)', () => {
     const app = sampleApp();
     const withoutBase = {
-      sceneId: app.sceneId,
       hueMode: app.hueMode,
       fixedHue: app.fixedHue,
       background: app.background,
       seed: app.seed,
-      autoCycle: app.autoCycle,
       bpm: app.bpm,
       tempoLocked: app.tempoLocked,
       audioRunning: app.audioRunning,
@@ -434,6 +421,15 @@ describe('parseDeckResponse', () => {
     if (parsed?.kind === 'deck:state') {
       expect(parsed.state.app?.baseHue).toBe(app.fixedHue);
     }
+  });
+
+  it('ignores legacy sceneId / autoCycle in the app block (older host)', () => {
+    const legacy = { ...sampleApp(), sceneId: 'bars', autoCycle: true };
+    const parsed = parseDeckResponse({
+      kind: 'deck:state',
+      state: { ...sampleState(), app: legacy },
+    } as unknown);
+    expect(parsed).toEqual({ kind: 'deck:state', state: sampleState({ app: sampleApp() }) });
   });
 
   it('keeps app undefined when the field is missing (legacy host)', () => {
@@ -450,18 +446,16 @@ describe('parseDeckResponse', () => {
     const invalids: unknown[] = [
       null,
       [],
-      { ...sampleApp(), sceneId: 1 },
       { ...sampleApp(), hueMode: 'spin' },
       { ...sampleApp(), fixedHue: Number.NaN },
       { ...sampleApp(), baseHue: Number.NaN },
       { ...sampleApp(), baseHue: '180' },
       { ...sampleApp(), background: 'white' },
       { ...sampleApp(), seed: 3 },
-      { ...sampleApp(), autoCycle: 1 },
       { ...sampleApp(), bpm: Number.POSITIVE_INFINITY },
       { ...sampleApp(), tempoLocked: 'yes' },
       { ...sampleApp(), audioRunning: 'no' },
-      { sceneId: 'bars' },
+      { hueMode: 'cycle' },
     ];
     for (const app of invalids) {
       expect(

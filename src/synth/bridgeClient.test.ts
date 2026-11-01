@@ -24,7 +24,6 @@ const control = vi.hoisted(() => ({
   startRecording: vi.fn(),
   stopRecording: vi.fn(),
   loadRecording: vi.fn(),
-  setBlendMode: vi.fn(),
 }));
 
 vi.mock('./control', () => ({
@@ -91,14 +90,14 @@ afterEach(() => {
 describe('parseBridgePort', () => {
   it('returns null when the parameter is absent', () => {
     expect(parseBridgePort('')).toBeNull();
-    expect(parseBridgePort('?scene=bars&ui=hide')).toBeNull();
+    expect(parseBridgePort('?seed=abc&ui=hide')).toBeNull();
   });
 
   it('maps the enable forms to the default port', () => {
     expect(parseBridgePort('?bridge=1')).toBe(7877);
     expect(parseBridgePort('?bridge=true')).toBe(7877);
     expect(parseBridgePort('?bridge')).toBe(7877);
-    expect(parseBridgePort('?scene=bars&bridge=1')).toBe(7877);
+    expect(parseBridgePort('?seed=abc&bridge=1')).toBe(7877);
   });
 
   it('accepts an explicit port', () => {
@@ -123,7 +122,7 @@ describe('parseBridgePort', () => {
 describe('parseRoomId', () => {
   it('returns null when the parameter is absent', () => {
     expect(parseRoomId('')).toBeNull();
-    expect(parseRoomId('?scene=semantic-synth&bridge=1')).toBeNull();
+    expect(parseRoomId('?seed=abc&bridge=1')).toBeNull();
   });
 
   it('accepts base64url ids in the accepted length range', () => {
@@ -145,7 +144,7 @@ describe('parseRoomId', () => {
 
 describe('resolveBridgeUrl', () => {
   it('returns null when neither parameter is present', () => {
-    expect(resolveBridgeUrl('?scene=bars', 'example.com', 'https:')).toBeNull();
+    expect(resolveBridgeUrl('?seed=abc', 'example.com', 'https:')).toBeNull();
   });
 
   it('builds a same-origin relay URL, matching the page scheme', () => {
@@ -186,7 +185,7 @@ describe('resolveBridgeUrl', () => {
 describe('parseMirrorMode', () => {
   it('returns false when the parameter is absent', () => {
     expect(parseMirrorMode('')).toBe(false);
-    expect(parseMirrorMode('?scene=semantic-synth&bridge=1')).toBe(false);
+    expect(parseMirrorMode('?seed=abc&bridge=1')).toBe(false);
   });
 
   it('returns false for empty or non-enable values', () => {
@@ -212,7 +211,7 @@ describe('parseMirrorMode', () => {
 
 describe('initBridgeClient', () => {
   it('does not construct a WebSocket without the URL parameter', () => {
-    stubEnv('?scene=bars');
+    stubEnv('?seed=abc');
     expect(initBridgeClient()).toBeNull();
     expect(FakeWebSocket.instances).toHaveLength(0);
   });
@@ -255,7 +254,7 @@ describe('initBridgeClient', () => {
   });
 
   it('connects to the same-origin relay and announces the synth role', () => {
-    stubEnv('?scene=semantic-synth&room=abcd1234', 'vj.example.com', 'https:');
+    stubEnv('?seed=abc&room=abcd1234', 'vj.example.com', 'https:');
     const handle = initBridgeClient();
     const ws = FakeWebSocket.instances[0];
     expect(ws.url).toBe('wss://vj.example.com/room/abcd1234');
@@ -280,7 +279,7 @@ describe('initBridgeClient', () => {
   });
 
   it('announces the mirror role when ?room=...&mirror=1', () => {
-    stubEnv('?scene=semantic-synth&room=abcd1234&mirror=1', 'vj.example.com', 'https:');
+    stubEnv('?seed=abc&room=abcd1234&mirror=1', 'vj.example.com', 'https:');
     const handle = initBridgeClient();
     const ws = FakeWebSocket.instances[0];
     expect(ws.url).toBe('wss://vj.example.com/room/abcd1234');
@@ -372,19 +371,6 @@ describe('handleBridgeMessage', () => {
     const res = handleBridgeMessage('{"id":3,"method":"proposeSeed","params":{"seed":42}}');
     expect(control.proposeSeed).not.toHaveBeenCalled();
     expect(res).toEqual({ id: 3, error: 'proposeSeed requires params.seed as string' });
-  });
-
-  it('routes setBlendMode', () => {
-    control.setBlendMode.mockReturnValue({ ok: true, mode: 'screen' });
-    const res = handleBridgeMessage('{"id":20,"method":"setBlendMode","params":{"mode":"screen"}}');
-    expect(control.setBlendMode).toHaveBeenCalledWith('screen');
-    expect(res).toEqual({ id: 20, result: { ok: true, mode: 'screen' } });
-  });
-
-  it('rejects setBlendMode with a non-string mode', () => {
-    const res = handleBridgeMessage('{"id":21,"method":"setBlendMode","params":{"mode":1}}');
-    expect(control.setBlendMode).not.toHaveBeenCalled();
-    expect(res).toEqual({ id: 21, error: 'setBlendMode requires params.mode as string' });
   });
 
   it('routes applyTimelineOp', () => {

@@ -12,8 +12,10 @@ import {
   FULLSCREEN_VERT,
   Uniforms,
 } from '../render/glutil';
+import { AUDIO_TEXTURE_KINDS, headlessAudioTexels } from '../synth/audioTextures';
 import { inlineCatalog } from '../synth/generators';
 import { assemblePatch, SEED_UNIFORM } from '../synth/gl/assemble';
+import { createAudioTextureSet, type AudioTextureSet } from '../synth/gl/audioTextureGl';
 import { namespaceToU32, seedToU32 } from '../synth/rng';
 import type { VisualPatch } from '../synth/types';
 
@@ -62,9 +64,11 @@ export function createThumbRenderer(w = 192, h = 108): ThumbRenderer {
 
   let vao: WebGLVertexArrayObject;
   let dummy: WebGLTexture;
+  let audioTextures: AudioTextureSet;
   try {
     vao = createEmptyVao(gl);
     dummy = makeDummyTexture(gl);
+    audioTextures = makeAudioTextures(gl);
   } catch {
     return { render: () => null, dispose: () => {} };
   }
@@ -82,9 +86,12 @@ export function createThumbRenderer(w = 192, h = 108): ThumbRenderer {
   const onContextRestored = (): void => {
     // ロスト前の program は無効。deleteProgram は呼ばずに捨てる。
     cache.clear();
+    // ロスト前のテクスチャハンドルは無効。delete せず捨てて、固定信号を再投入する。
+    audioTextures.forget();
     try {
       vao = createEmptyVao(gl);
       dummy = makeDummyTexture(gl);
+      audioTextures = makeAudioTextures(gl);
       ready = true;
     } catch {
       ready = false;
@@ -143,6 +150,9 @@ export function createThumbRenderer(w = 192, h = 108): ThumbRenderer {
       }
 
       bindDummyTextures(gl, uni, assembled.textures, dummy);
+      // スペクトラム / 波形を読む Generator 用。固定の合成信号（時間非依存）なので
+      // サムネイルは毎回同じ絵になる。宣言のない Patch では何もしない。
+      audioTextures.bind(uni, assembled);
       drawFullscreen(gl, vao);
       return canvas.toDataURL('image/png');
     } catch {
@@ -161,6 +171,7 @@ export function createThumbRenderer(w = 192, h = 108): ThumbRenderer {
     cache.clear();
     gl.deleteVertexArray(vao);
     gl.deleteTexture(dummy);
+    audioTextures.dispose();
     const lose = gl.getExtension('WEBGL_lose_context');
     lose?.loseContext();
   };
@@ -257,6 +268,16 @@ function makeDummyTexture(gl: WebGL2RenderingContext): WebGLTexture {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.bindTexture(gl.TEXTURE_2D, null);
   return tex;
+}
+
+/**
+ * サムネイル用のオーディオテクスチャ。ヘッドレスと同じ固定の合成信号を一度だけ
+ * 上げる。drawDeck と違い毎フレームの更新は不要（サムネイルは凍結した 1 コマ）。
+ */
+function makeAudioTextures(gl: WebGL2RenderingContext): AudioTextureSet {
+  const set = createAudioTextureSet(gl);
+  for (const kind of AUDIO_TEXTURE_KINDS) set.upload(kind, headlessAudioTexels(kind));
+  return set;
 }
 
 function bindDummyTextures(

@@ -10,6 +10,7 @@ import {
   Uniforms,
 } from '../render/glutil';
 import { gatePatchProposal } from '../synth/apply';
+import { createSpectrumSmoother, packWave, WAVE_SAMPLES } from '../synth/audioTextures';
 import { createCatalog } from '../synth/catalog';
 import {
   notifySynthControlChanged,
@@ -19,6 +20,7 @@ import {
 import { DEFAULT_BUDGETS } from '../synth/cost';
 import { derivePatch } from '../synth/derive';
 import { assemblePatch, SEED_UNIFORM, type AssembledShader } from '../synth/gl/assemble';
+import { createAudioTextureSet, type AudioTextureSet } from '../synth/gl/audioTextureGl';
 import { allGeneratorDefinitions, inlineCatalog } from '../synth/generators';
 import {
   base64ToBlob,
@@ -201,6 +203,19 @@ let dummyTexture: WebGLTexture | null = null;
 /** 解決できなかった参照。警告はキーごとに1回だけ出す（毎フレーム出さない）。 */
 const warnedImages = new Set<string>();
 let unsubscribeImages: (() => void) | null = null;
+
+// ---- audio textures (spectrum / wave; see synth/audioTextures) ----
+/**
+ * Spectrum attack/release + peak hold. CPU state, not GL state: it advances
+ * every frame whether or not a deck reads it (so a patch that switches in
+ * starts from a warm meter), survives context loss, and is only reset in
+ * dispose().
+ */
+const spectrum = createSpectrumSmoother();
+let spectrumTexels: Uint8Array = new Uint8Array(0);
+let waveTexels: Uint8Array = new Uint8Array(WAVE_SAMPLES * 4);
+/** GL textures for the above. Rebuilt per context in init(); lazily allocated. */
+let audioTextures: AudioTextureSet | null = null;
 
 // ---- timeline / external control ----
 let timeline: PerformanceTimeline = { lockedUntilSec: 0, events: [] };
@@ -768,8 +783,40 @@ function drawDeck(
   }
 
   bindTextures(gl, uni, assembled, patch);
+  audioTextures?.bind(uni, assembled);
 
   if (vao) drawFullscreen(gl, vao);
+}
+
+/** True when a deck's shader samples any audio texture. */
+function readsAudio(deck: SynthDeck | null): boolean {
+  return deck !== null && deck.assembled.audioTextures.length > 0;
+}
+
+/**
+ * Push this frame's spectrum / wave to the GPU — only the kinds an on-screen
+ * deck actually reads. Both decks of a crossfade share the same textures (the
+ * sound is the same), so this runs once per frame, before either deck draws.
+ */
+function uploadAudioTextures(s: GlSceneContext): void {
+  if (!audioTextures) return;
+  const decks = phase === 'fading' ? [front, incoming] : [front];
+  let wantSpectrum = false;
+  let wantWave = false;
+  for (const deck of decks) {
+    for (const a of deck?.assembled.audioTextures ?? []) {
+      if (a.kind === 'spectrum') wantSpectrum = true;
+      else wantWave = true;
+    }
+  }
+  if (wantSpectrum) {
+    spectrumTexels = spectrum.pack(spectrumTexels);
+    audioTextures.upload('spectrum', spectrumTexels);
+  }
+  if (wantWave) {
+    waveTexels = packWave(s.audio.wave, s.audio.running, waveTexels);
+    audioTextures.upload('wave', waveTexels);
+  }
 }
 
 /** The next lower rung of {@link SCALE_STEPS}, never raising the resolution. */
@@ -997,6 +1044,10 @@ export const semanticSynthScene: GlScene = {
     unsubscribeImages = subscribeImages(() => {
       warnedImages.clear();
     });
+    // Same story for the audio textures: the old handles died with the old
+    // context. The smoother (CPU state) is kept, so the meter does not drop.
+    audioTextures?.forget();
+    audioTextures = createAudioTextureSet(gl);
 
     // timeline / scheduler / recorder は GL コンテキストのリソースではなく演奏中の
     // セッション状態なので、ここではリセットしない。init はコンテキストロスト
@@ -1061,6 +1112,9 @@ export const semanticSynthScene: GlScene = {
     const patchSpeed = phase === 'fading' ? speedA + (speedB - speedA) * fadeB : speedA;
     // 描画しないフレームでも進めておく（音が鳴っている間に時計が止まらないように）。
     motion.advance(audio, dt, patchSpeed);
+    // Same rule for the spectrum meter: it keeps falling/rising on frames that
+    // draw nothing, so it is never stale when an audio patch comes on screen.
+    spectrum.update(audio, dt);
 
     // Keep the controller fed even on frames that draw nothing.
     let scale = quality ? quality.update(dt * 1000, nowMs) : 1;
@@ -1088,6 +1142,10 @@ export const semanticSynthScene: GlScene = {
     const renderW = target ? target.w : pxW;
     const renderH = target ? target.h : pxH;
 
+    if (readsAudio(front) || (phase === 'fading' && readsAudio(incoming))) {
+      uploadAudioTextures(s);
+    }
+
     // Old deck first, new deck over it — premultiplied blend does the rest.
     drawDeck(s, front, fadeA, renderW, renderH);
     if (phase === 'fading' && incoming) {
@@ -1113,6 +1171,9 @@ export const semanticSynthScene: GlScene = {
     unsubscribeImages?.();
     unsubscribeImages = null;
     disposeTextures(gl);
+    audioTextures?.dispose();
+    audioTextures = null;
+    spectrum.reset();
     // Session state (timeline / scheduler / recorder) is only ever dropped here,
     // when the scene itself goes away — not in init(), which also runs on
     // context-restore and must not wipe out a performance in progress.

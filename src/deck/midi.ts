@@ -123,11 +123,28 @@ export function parseMidiMapping(input: unknown): MidiMapping | null {
   if (!Array.isArray(input.bindings)) return null;
   const bindings: MidiBinding[] = [];
   for (const item of input.bindings) {
+    // 廃止したアクション（シーン切替）を参照する保存済みバインドは黙って捨てる。
+    // 残りのバインドまで巻き添えにしない。
+    if (isRetiredBinding(item)) continue;
     const binding = parseMidiBinding(item);
     if (binding === null) return null;
     bindings.push(binding);
   }
   return { version: 1, name: input.name, bindings };
+}
+
+/** 単一シーン化で廃止した DeckCommand.kind。旧版が localStorage に残している可能性がある。 */
+const RETIRED_COMMAND_KINDS: ReadonlySet<string> = new Set([
+  'scene:set',
+  'scene:shift',
+  'autoCycle:set',
+]);
+
+function isRetiredBinding(item: unknown): boolean {
+  if (!isRecord(item) || !isRecord(item.action)) return false;
+  if (item.action.type !== 'command' || !isRecord(item.action.command)) return false;
+  const kind = item.action.command.kind;
+  return typeof kind === 'string' && RETIRED_COMMAND_KINDS.has(kind);
 }
 
 export function parseMidiStorage(input: unknown): MidiStorage | null {
@@ -332,18 +349,6 @@ export const MIDI_LEARN_ITEMS: MidiLearnItem[] = [
     label: 'hue',
     action: { type: 'command', command: { kind: 'hue:fixed', hue: 0 } },
     ccEdge: 'value',
-  },
-  {
-    id: 'scene.prev',
-    label: 'scene ‹',
-    action: { type: 'command', command: { kind: 'scene:shift', delta: -1 } },
-    ccEdge: 'press',
-  },
-  {
-    id: 'scene.next',
-    label: 'scene ›',
-    action: { type: 'command', command: { kind: 'scene:shift', delta: 1 } },
-    ccEdge: 'press',
   },
 ];
 

@@ -121,6 +121,15 @@ import { wetConcreteGenerator } from './wetConcrete';
 import { windowsGenerator } from './windows';
 import { wiresGenerator } from './wires';
 import { xeroxGenerator } from './xerox';
+import { auroraCurtainGenerator } from './auroraCurtain';
+import { beatRingsGenerator } from './beatRings';
+import { inkMarbleGenerator } from './inkMarble';
+import { lissajousScopeGenerator } from './lissajousScope';
+import { oscilloscopeGenerator } from './oscilloscope';
+import { particleFieldGenerator } from './particleField';
+import { smokeFogGenerator } from './smokeFog';
+import { spectrumBarsGenerator } from './spectrumBars';
+import { spectrumRadialGenerator } from './spectrumRadial';
 import type { InlineGenerator, InlineGeneratorCatalog } from './types';
 
 export type { EmitContext, InlineGenerator, InlineGeneratorCatalog } from './types';
@@ -242,6 +251,15 @@ export { blueprintGenerator, blueprintDef } from './blueprint';
 export { goldfoilGenerator, goldfoilDef } from './goldfoil';
 export { hatchingGenerator, hatchingDef } from './hatching';
 export { stampGenerator, stampDef } from './stamp';
+export { auroraCurtainGenerator, auroraCurtainDef } from './auroraCurtain';
+export { beatRingsGenerator, beatRingsDef } from './beatRings';
+export { inkMarbleGenerator, inkMarbleDef } from './inkMarble';
+export { lissajousScopeGenerator, lissajousScopeDef } from './lissajousScope';
+export { oscilloscopeGenerator, oscilloscopeDef } from './oscilloscope';
+export { particleFieldGenerator, particleFieldDef } from './particleField';
+export { smokeFogGenerator, smokeFogDef } from './smokeFog';
+export { spectrumBarsGenerator, spectrumBarsDef } from './spectrumBars';
+export { spectrumRadialGenerator, spectrumRadialDef } from './spectrumRadial';
 
 const ALL: InlineGenerator[] = [
   // sources
@@ -300,6 +318,18 @@ const ALL: InlineGenerator[] = [
   sdfPlanetGenerator,
   // 画像入力を持つ source（seed ガチャの対象外 — derive.ts が textures 持ちを除外する）
   stampGenerator,
+  // legacy-scene ports (bars / radial / waveform / lissajous / rings / particles /
+  // fluid / smoke / aurora). The spectrum / scope ones read the per-frame audio
+  // textures (def.audio) — unlike image slots they stay in the seed gacha.
+  spectrumBarsGenerator,
+  spectrumRadialGenerator,
+  oscilloscopeGenerator,
+  lissajousScopeGenerator,
+  beatRingsGenerator,
+  particleFieldGenerator,
+  inkMarbleGenerator,
+  smokeFogGenerator,
+  auroraCurtainGenerator,
   // fields
   noiseGenerator,
   vortexGenerator,

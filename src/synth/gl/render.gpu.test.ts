@@ -308,6 +308,87 @@ describe('synth/gl assemblePatch GPU render', () => {
   );
 
   it(
+    'audio-texture sources follow the signal: drawn with audio, empty / flat when idle',
+    async () => {
+      const failures: string[] = [];
+      /** [generatorId, param overrides, idle must be empty] */
+      const cases: Array<[string, Record<string, string>, boolean]> = [
+        ...['bottom', 'center', 'opposed', 'sides'].map(
+          (layout): [string, Record<string, string>, boolean] => ['spectrumBars', { layout }, true],
+        ),
+        ['spectrumRadial', { style: 'spikes' }, true],
+        ['spectrumRadial', { style: 'twin' }, true],
+        ['spectrumRadial', { style: 'blob' }, false],
+        ['oscilloscope', { layout: 'line' }, false],
+        ['oscilloscope', { layout: 'circle' }, false],
+        ['lissajousScope', { style: 'scope' }, false],
+      ];
+      for (const [id, overrides, idleEmpty] of cases) {
+        const op = opFromDef('src0', requireGen(id).def);
+        Object.assign(op.parameters, overrides);
+        const patch = basePatch([op], SEED);
+        const label = `${id} ${JSON.stringify(overrides)}`;
+
+        const live = await renderPatchFrame(pg, patch, SIZE, 'pattern', 1.0, 'synthetic');
+        if (!live.ok) {
+          failures.push(`${label}: ${live.log}`);
+          continue;
+        }
+        if (live.frame.alphaCount === 0 || live.frame.uniform) {
+          failures.push(`${label}: drew nothing / a flat fill with the synthetic signal`);
+        }
+        // a spectrum overlay must leave most of the frame clear
+        if (live.frame.solidFraction > 0.6) {
+          failures.push(`${label}: solidFraction ${live.frame.solidFraction} — fills the frame`);
+        }
+
+        const idle = await renderPatchFrame(pg, patch, SIZE, 'pattern', 1.0, 'idle');
+        if (!idle.ok) {
+          failures.push(`${label} (idle): ${idle.log}`);
+          continue;
+        }
+        if (idleEmpty && idle.frame.alphaCount !== 0) {
+          failures.push(
+            `${label}: idle spectrum must draw nothing, got ${idle.frame.alphaCount} px`,
+          );
+        }
+        if (!idleEmpty && idle.frame.alphaCount >= live.frame.alphaCount * 4) {
+          failures.push(`${label}: idle frame is far busier than the live one`);
+        }
+      }
+      if (failures.length > 0) {
+        throw new Error(`audio-texture source check failed:\n\n${failures.join('\n')}`);
+      }
+    },
+    renderTimeoutMs,
+  );
+
+  it(
+    'ported fog / ink / aurora sources render continuous tone and leave the frame open',
+    async () => {
+      const failures: string[] = [];
+      for (const id of ['inkMarble', 'smokeFog', 'auroraCurtain']) {
+        const patch = basePatch([opFromDef('src0', requireGen(id).def)], SEED);
+        const res = await renderPatchFrame(pg, patch, SIZE, 'pattern', 4.3);
+        if (!res.ok) {
+          failures.push(`${id}: ${res.log}`);
+          continue;
+        }
+        const { distinctAlphaLevels, solidFraction } = res.frame;
+        console.log(
+          `[render.gpu.test] ${id}: ${distinctAlphaLevels} alpha levels, solid ${solidFraction.toFixed(3)}`,
+        );
+        if (distinctAlphaLevels < 40) failures.push(`${id}: only ${distinctAlphaLevels} levels`);
+        if (solidFraction > 0.6) failures.push(`${id}: solidFraction ${solidFraction} — a slab`);
+      }
+      if (failures.length > 0) {
+        throw new Error(`ported soft source check failed:\n\n${failures.join('\n')}`);
+      }
+    },
+    renderTimeoutMs,
+  );
+
+  it(
     `low-res (${SIZE_LOW}): all Sources keep non-zero alpha (${SOURCE_NEON.length} patches)`,
     async () => {
       expect(SOURCE_NEON.length).toBeGreaterThan(0);

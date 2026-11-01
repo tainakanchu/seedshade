@@ -1,3 +1,5 @@
+import type { AudioTextureKind } from './audioTextures';
+
 export type GeneratorCategory = 'source' | 'field' | 'modifier' | 'material';
 export type CostClass = 'micro' | 'light' | 'medium' | 'heavy';
 /** inline: GLSL 関数として融合 / pass: 独立した FBO パス */
@@ -59,6 +61,17 @@ export interface GeneratorDefinition {
    * 受け取らない = 既存の Generator はすべて不変。
    */
   textures?: string[];
+  /**
+   * 毎フレームのオーディオ・テクスチャ（スペクトラム / 波形）を読むか。
+   *
+   * 宣言した Generator を含む Patch にだけ、assembler が `uSpectrum` / `uWave`
+   * の sampler2D と GLSL ヘルパ（`spectrumAt` / `waveAt` など）を出し、シーンが
+   * Nx1 のテクスチャを毎フレーム上げる。中身・無音時・ヘッドレス時の約束は
+   * `./audioTextures.ts` の冒頭。`textures`（画像スロット）と違い Patch 側に
+   * 割り当ては要らないので、seed ガチャ（derive）の候補からも外さない。
+   * 省略した Generator は今までどおり = 既存 Patch のシェーダはバイト単位で不変。
+   */
+  audio?: AudioTextureKind[];
 }
 
 export interface VisualOperator {

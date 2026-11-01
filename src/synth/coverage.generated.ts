@@ -26,6 +26,10 @@ export const GENERATOR_COVERAGE: CoverageTable = {
     meanAlpha: { p10: 0.5008, p50: 0.7502, p90: 0.8416 },
     solidFraction: { p10: 0.4863, p50: 0.7953, p90: 0.9104 },
   },
+  auroraCurtain: {
+    meanAlpha: { p10: 0.142, p50: 0.1873, p90: 0.2308 },
+    solidFraction: { p10: 0.0423, p50: 0.1423, p90: 0.2255 },
+  },
   barcode: {
     meanAlpha: { p10: 0.3674, p50: 0.458, p90: 0.5473 },
     solidFraction: { p10: 0.3652, p50: 0.4525, p90: 0.5652 },
@@ -37,6 +41,10 @@ export const GENERATOR_COVERAGE: CoverageTable = {
   beatMoire: {
     meanAlpha: { p10: 0.4536, p50: 0.7063, p90: 0.8294 },
     solidFraction: { p10: 0.4472, p50: 0.761, p90: 0.9029 },
+  },
+  beatRings: {
+    meanAlpha: { p10: 0.0412, p50: 0.0525, p90: 0.0992 },
+    solidFraction: { p10: 0.0104, p50: 0.0264, p90: 0.0417 },
   },
   bellowsHose: {
     meanAlpha: { p10: 0.0596, p50: 0.0636, p90: 0.0705 },
@@ -210,6 +218,10 @@ export const GENERATOR_COVERAGE: CoverageTable = {
     meanAlpha: { p10: 0.2083, p50: 0.6378, p90: 0.9313 },
     solidFraction: { p10: 0.0, p50: 0.6135, p90: 0.9394 },
   },
+  inkMarble: {
+    meanAlpha: { p10: 0.1096, p50: 0.3185, p90: 0.4276 },
+    solidFraction: { p10: 0.0156, p50: 0.2549, p90: 0.4152 },
+  },
   interlaceComb: {
     meanAlpha: { p10: 0.5128, p50: 0.7789, p90: 0.8831 },
     solidFraction: { p10: 0.5225, p50: 0.8143, p90: 0.9157 },
@@ -233,6 +245,10 @@ export const GENERATOR_COVERAGE: CoverageTable = {
   lavaBlobs: {
     meanAlpha: { p10: 0.1227, p50: 0.2764, p90: 0.3232 },
     solidFraction: { p10: 0.0808, p50: 0.1467, p90: 0.1782 },
+  },
+  lissajousScope: {
+    meanAlpha: { p10: 0.0221, p50: 0.0436, p90: 0.065 },
+    solidFraction: { p10: 0.0205, p50: 0.0391, p90: 0.0573 },
   },
   macroblock: {
     meanAlpha: { p10: 0.4398, p50: 0.7981, p90: 0.9053 },
@@ -274,6 +290,10 @@ export const GENERATOR_COVERAGE: CoverageTable = {
     meanAlpha: { p10: 0.5518, p50: 0.7828, p90: 0.8753 },
     solidFraction: { p10: 0.5828, p50: 0.8336, p90: 0.9272 },
   },
+  oscilloscope: {
+    meanAlpha: { p10: 0.0309, p50: 0.0397, p90: 0.0559 },
+    solidFraction: { p10: 0.0238, p50: 0.0346, p90: 0.0488 },
+  },
   outline: {
     meanAlpha: { p10: 0.0098, p50: 0.1143, p90: 0.3176 },
     solidFraction: { p10: 0.0097, p50: 0.1115, p90: 0.3009 },
@@ -281,6 +301,10 @@ export const GENERATOR_COVERAGE: CoverageTable = {
   paCarpet: {
     meanAlpha: { p10: 0.4471, p50: 0.7019, p90: 0.8098 },
     solidFraction: { p10: 0.4676, p50: 0.7824, p90: 0.9051 },
+  },
+  particleField: {
+    meanAlpha: { p10: 0.033, p50: 0.0437, p90: 0.0942 },
+    solidFraction: { p10: 0.0125, p50: 0.0207, p90: 0.0378 },
   },
   pcbMaze: {
     meanAlpha: { p10: 0.1224, p50: 0.1465, p90: 0.1911 },
@@ -406,9 +430,21 @@ export const GENERATOR_COVERAGE: CoverageTable = {
     meanAlpha: { p10: 0.4949, p50: 0.7789, p90: 0.8961 },
     solidFraction: { p10: 0.5004, p50: 0.8071, p90: 0.9146 },
   },
+  smokeFog: {
+    meanAlpha: { p10: 0.0297, p50: 0.209, p90: 0.3925 },
+    solidFraction: { p10: 0.0113, p50: 0.1382, p90: 0.3745 },
+  },
   sodium: {
     meanAlpha: { p10: 0.3722, p50: 0.7359, p90: 0.947 },
     solidFraction: { p10: 0.3247, p50: 0.7561, p90: 0.949 },
+  },
+  spectrumBars: {
+    meanAlpha: { p10: 0.1032, p50: 0.1536, p90: 0.1875 },
+    solidFraction: { p10: 0.1266, p50: 0.1704, p90: 0.2127 },
+  },
+  spectrumRadial: {
+    meanAlpha: { p10: 0.0335, p50: 0.0638, p90: 0.1201 },
+    solidFraction: { p10: 0.023, p50: 0.0299, p90: 0.0487 },
   },
   spin: {
     meanAlpha: { p10: 0.5216, p50: 0.7731, p90: 0.8908 },

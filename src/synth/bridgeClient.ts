@@ -111,8 +111,7 @@ export function resolveBridgeUrl(search: string, host: string, protocol: string)
  * URL の query から表示専用（mirror）モードかどうかを決める。
  *
  * `mirror=1` / `mirror=true` だけを true にする。`?mirror`（値なし）や不正値は
- * false。autocycle と同じ作法。mirror は URL 専用・非永続で、bridge / room と
- * 併用して「同じ中継に表示専用として接続する」用途に使う。
+ * false。mirror は URL 専用・非永続で、bridge / room と併用して「同じ中継に表示専用として接続する」用途に使う。
  */
 export function parseMirrorMode(search: string): boolean {
   let raw: string | null;
@@ -172,13 +171,6 @@ function dispatch(
       if (typeof seed !== 'string') return fail('proposeSeed requires params.seed as string');
       control.proposeSeed(seed);
       return ok({ ok: true });
-    }
-
-    case 'setBlendMode': {
-      const mode = params?.mode;
-      if (typeof mode !== 'string') return fail('setBlendMode requires params.mode as string');
-      // 不正値は control 側が normal に倒して warning を返す（常に ok）。
-      return ok(control.setBlendMode(mode));
     }
 
     case 'setImage': {

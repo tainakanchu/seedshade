@@ -1,25 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_SCENE_ID } from '../scenes';
 
 export type HueMode = 'cycle' | 'fixed';
 export type Background = 'black' | 'transparent';
-export type CycleMode = 'seconds' | 'bars';
 
 export interface Settings {
-  sceneId: string;
   /** Audio gain multiplier, 0.5..4. */
   gain: number;
   hueMode: HueMode;
   /** Fixed hue 0..360 (used when hueMode === 'fixed'). */
   fixedHue: number;
   background: Background;
-  autoCycle: boolean;
-  /** Seconds between scene changes when auto-cycling. */
-  cycleSeconds: number;
-  /** Whether auto-cycle advances by seconds or by musical bars. */
-  cycleMode: CycleMode;
-  /** Bars between scene changes when cycleMode === 'bars' (1..256). */
-  cycleBars: number;
   /** Auto-reroll the look-gacha every {@link gachaBars} bars. */
   autoGacha: boolean;
   /** Bars between automatic look rerolls (1..512). */
@@ -36,15 +26,10 @@ const STORAGE_KEY = 'seedshade-settings';
 const SEED_MAX_LEN = 64;
 
 const DEFAULT_SETTINGS: Settings = {
-  sceneId: DEFAULT_SCENE_ID,
   gain: 1.5,
   hueMode: 'cycle',
   fixedHue: 200,
   background: 'black',
-  autoCycle: false,
-  cycleSeconds: 30,
-  cycleMode: 'seconds',
-  cycleBars: 16,
   autoGacha: false,
   gachaBars: 32,
   deviceId: '',
@@ -79,30 +64,17 @@ function loadStored(): Partial<Settings> {
   return {};
 }
 
-/**
- * Result of reading URL params: setting overrides plus the `ui=hide` flag and
- * the raw `overlay` / `blend` values.
- *
- * `overlayRaw` / `blendRaw` are intentionally NOT part of `overrides`/`Settings`:
- * they are URL-only and never persisted to localStorage (see {@link UseSettingsResult}).
- */
+/** Result of reading URL params: setting overrides plus the `ui=hide` flag. */
 interface UrlConfig {
   overrides: Partial<Settings>;
   uiHidden: boolean;
-  overlayRaw: string | null;
-  blendRaw: string | null;
 }
 
 function readUrl(): UrlConfig {
   const overrides: Partial<Settings> = {};
   let uiHidden = false;
-  let overlayRaw: string | null = null;
-  let blendRaw: string | null = null;
   try {
     const p = new URLSearchParams(window.location.search);
-
-    const scene = p.get('scene');
-    if (scene) overrides.sceneId = scene;
 
     const bg = p.get('bg');
     if (bg === 'transparent' || bg === 'black') overrides.background = bg;
@@ -110,23 +82,11 @@ function readUrl(): UrlConfig {
     const gain = p.get('gain');
     if (gain != null) overrides.gain = clampNum(parseFloat(gain), 0.5, 4, 1.5);
 
-    const cycle = p.get('cycle');
-    if (cycle != null) overrides.cycleSeconds = clampNum(parseFloat(cycle), 2, 600, 30);
-
     const hue = p.get('hue');
     if (hue != null) {
       overrides.hueMode = 'fixed';
       overrides.fixedHue = clampNum(parseFloat(hue), 0, 360, 200);
     }
-
-    const autocycle = p.get('autocycle');
-    if (autocycle != null) overrides.autoCycle = autocycle === '1' || autocycle === 'true';
-
-    const cyclemode = p.get('cyclemode');
-    if (cyclemode === 'bars' || cyclemode === 'seconds') overrides.cycleMode = cyclemode;
-
-    const cyclebars = p.get('cyclebars');
-    if (cyclebars != null) overrides.cycleBars = clampInt(parseFloat(cyclebars), 1, 256, 16);
 
     const autogacha = p.get('autogacha');
     if (autogacha != null) overrides.autoGacha = autogacha === '1' || autogacha === 'true';
@@ -141,29 +101,18 @@ function readUrl(): UrlConfig {
     if (seed) overrides.seed = sanitizeSeed(seed);
 
     uiHidden = p.get('ui') === 'hide';
-
-    // overlay / blend は URL 専用（永続化しない）。値の妥当性チェックは行わず、
-    // 生のまま持ち出す — 検証は App 側（overlay はベースシーン確定後、blend は
-    // resolveBlendMode）で行う。
-    overlayRaw = p.get('overlay');
-    blendRaw = p.get('blend');
   } catch {
     // Ignore malformed URL.
   }
-  return { overrides, uiHidden, overlayRaw, blendRaw };
+  return { overrides, uiHidden };
 }
 
 export function sanitizeSettings(s: Settings): Settings {
   return {
-    sceneId: typeof s.sceneId === 'string' && s.sceneId ? s.sceneId : DEFAULT_SETTINGS.sceneId,
     gain: clampNum(s.gain, 0.5, 4, DEFAULT_SETTINGS.gain),
     hueMode: s.hueMode === 'fixed' ? 'fixed' : 'cycle',
     fixedHue: clampNum(s.fixedHue, 0, 360, DEFAULT_SETTINGS.fixedHue),
     background: s.background === 'transparent' ? 'transparent' : 'black',
-    autoCycle: Boolean(s.autoCycle),
-    cycleSeconds: clampNum(s.cycleSeconds, 2, 600, DEFAULT_SETTINGS.cycleSeconds),
-    cycleMode: s.cycleMode === 'bars' ? 'bars' : 'seconds',
-    cycleBars: clampInt(s.cycleBars, 1, 256, DEFAULT_SETTINGS.cycleBars),
     autoGacha: Boolean(s.autoGacha),
     gachaBars: clampInt(s.gachaBars, 1, 512, DEFAULT_SETTINGS.gachaBars),
     deviceId: typeof s.deviceId === 'string' ? s.deviceId : '',
@@ -176,23 +125,6 @@ export interface UseSettingsResult {
   update: (patch: Partial<Settings>) => void;
   /** Whether the URL requested the UI start hidden (ui=hide). */
   initialUiHidden: boolean;
-  /**
-   * Raw `overlay` URL param value (unvalidated), or null if absent.
-   *
-   * Deliberately URL-only, like `initialUiHidden` — NOT part of `Settings`,
-   * never persisted to localStorage. If it were persisted, a user who once
-   * opened `?overlay=rings` would be stuck with the overlay forever, breaking
-   * the guarantee that "overlay 未指定時は現状と完全に同一の挙動" になる。
-   */
-  initialOverlayRaw: string | null;
-  /**
-   * Raw `blend` URL param value (unvalidated), or null if absent.
-   *
-   * Same URL-only policy as `initialOverlayRaw` — never part of `Settings`,
-   * never written to localStorage. Blend only has effect while an overlay is
-   * active; omitting `?blend=` must keep behaviour byte-identical to today.
-   */
-  initialBlendRaw: string | null;
 }
 
 /**
@@ -225,7 +157,5 @@ export function useSettings(): UseSettingsResult {
     settings,
     update,
     initialUiHidden: url.uiHidden,
-    initialOverlayRaw: url.overlayRaw,
-    initialBlendRaw: url.blendRaw,
   };
 }

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { scenes } from '../scenes';
 import { inlineCatalog } from '../synth/generators';
 import { serializePatch } from '../synth/schema';
 import type { TransitionPresetId, VisualPatch } from '../synth/types';
@@ -928,7 +927,6 @@ export function DeckApp(): React.ReactElement {
           fixedHue: app.fixedHue,
           hue: app.baseHue,
           background: app.background,
-          autoCycle: app.autoCycle,
           locked: shared.nowSec < shared.lockedUntilSec,
         }
       : null;
@@ -979,7 +977,8 @@ export function DeckApp(): React.ReactElement {
 
   let banner: string | null = null;
   if (!connected && missingHost) banner = 'メイン窓が見つかりません';
-  else if (connected && livePatch === null) banner = 'semantic-synth シーンにしてください';
+  else if (connected && livePatch === null)
+    banner = 'メイン窓の Synth が動いていません（WebGL2 が必要です）';
 
   return (
     <div className="deck-root">
@@ -987,9 +986,8 @@ export function DeckApp(): React.ReactElement {
         <div>
           <div className="deck-title">Scene Deck</div>
           <div className="deck-sub">
-            1–8 ポン出し · Shift+数字 cut · ←↑↓→ カーソル · Shift+←→ シーン · Enter/Space 決定 · T
-            tap · , ÷2 · . ×2 · / AUTO · X 遷移 · Q ガチャ · W 細部 · A auto · Shift+A autocycle · R
-            再生成 · G バンク · Shift+S 手札保存
+            1–8 ポン出し · Shift+数字 cut · ←↑↓→ カーソル · Enter/Space 決定 · T tap · , ÷2 · . ×2 ·
+            / AUTO · X 遷移 · Q ガチャ · W 細部 · A auto · R 再生成 · G バンク · Shift+S 手札保存
           </div>
         </div>
         <div className="deck-toolbar">
@@ -1309,41 +1307,6 @@ export function DeckApp(): React.ReactElement {
         </button>
         <button
           type="button"
-          className="btn icon"
-          disabled={!consoleEnabled}
-          aria-label="Previous scene"
-          onClick={() => postCommand({ kind: 'scene:shift', delta: -1 })}
-        >
-          ‹
-        </button>
-        <select
-          className="deck-scene-select"
-          disabled={!consoleEnabled}
-          value={app?.sceneId ?? ''}
-          aria-label="Scene"
-          onChange={(e) => {
-            postCommand({ kind: 'scene:set', sceneId: e.target.value });
-            e.currentTarget.blur();
-          }}
-        >
-          {app === undefined ? <option value="">scene</option> : null}
-          {scenes.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className="btn icon"
-          disabled={!consoleEnabled}
-          aria-label="Next scene"
-          onClick={() => postCommand({ kind: 'scene:shift', delta: 1 })}
-        >
-          ›
-        </button>
-        <button
-          type="button"
           className={`btn toggle${app?.hueMode === 'fixed' ? ' on' : ''}`}
           disabled={!consoleEnabled}
           onClick={() => {
@@ -1429,18 +1392,6 @@ export function DeckApp(): React.ReactElement {
           onClick={() => postCommand({ kind: 'tempo:auto' })}
         >
           AUTO
-        </button>
-        <button
-          type="button"
-          className={`btn toggle${app?.autoCycle ? ' on' : ''}`}
-          disabled={!consoleEnabled}
-          title="Main window auto-cycle (Shift+A)"
-          onClick={() => {
-            if (!app) return;
-            postCommand({ kind: 'autoCycle:set', on: !app.autoCycle });
-          }}
-        >
-          autocycle
         </button>
         <button
           type="button"
