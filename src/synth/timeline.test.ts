@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { gatePatchProposal } from './apply';
+import { createCatalog } from './catalog';
+import { allGeneratorDefinitions, inlineCatalog } from './generators';
+import { createRecorder, replayTimeline } from './recording';
+import { derivePatch } from './derive';
 import type { AudioFrame } from '../audio/types';
 import { DEFAULT_TRANSITION } from './types';
 import {
@@ -51,6 +56,40 @@ function snap(tl: PerformanceTimeline): string {
 // ---------------------------------------------------------------------------
 // applyOp — success paths
 // ---------------------------------------------------------------------------
+
+describe('patch admission', () => {
+  it.each(['schema', 'catalog', 'budget'])('rejects %s-invalid intent patches', (kind) => {
+    const patch = derivePatch('timeline-admission', { catalog: inlineCatalog });
+    if (kind === 'schema') patch.qualityTier = 'invalid' as typeof patch.qualityTier;
+    if (kind === 'catalog') patch.operators[0]!.generatorId = 'missing-generator';
+    if (kind === 'budget') {
+      patch.qualityTier = 'low';
+      patch.operators[0]!.generatorId = 'sdfTunnel';
+      patch.operators[0]!.parameters = {};
+      patch.routes = [];
+      const result = gatePatchProposal(patch, createCatalog(allGeneratorDefinitions()));
+      expect(result.issues.some((issue) => issue.code.startsWith('budget_'))).toBe(true);
+    }
+    const event = makeEvent({ id: 'bad', intent: { patch } });
+    const tl = emptyTl();
+    expect(applyOp(tl, { op: 'add', event }, ctx()).ok).toBe(false);
+    const recorder = createRecorder(
+      'test',
+      patch.seed,
+      derivePatch('initial', { catalog: inlineCatalog }),
+    );
+    recorder.recordOp(0, { op: 'add', event });
+    recorder.recordOp(1, { op: 'add', event: makeEvent({ id: 'good' }) });
+    expect(replayTimeline(recorder.snapshot(), Infinity).events.map((event) => event.id)).toEqual([
+      'good',
+    ]);
+    const existing = { ...tl, events: [makeEvent({ id: 'bad' })] };
+    expect(applyOp(existing, { op: 'replace', id: 'bad', event }, ctx()).ok).toBe(false);
+    expect(applyOp(existing, { op: 'setIntent', id: 'bad', intent: { patch } }, ctx()).ok).toBe(
+      false,
+    );
+  });
+});
 
 describe('applyOp', () => {
   describe('success cases', () => {

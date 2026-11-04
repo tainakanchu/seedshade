@@ -1,3 +1,6 @@
+import { gatePatchProposal } from './apply';
+import { createCatalog } from './catalog';
+import { allGeneratorDefinitions } from './generators';
 import type { AudioFrame } from '../audio/types';
 import type { TransitionSpec, VisualPatch } from './types';
 
@@ -193,6 +196,8 @@ function validateTransition(t: TransitionSpec): string | null {
   return null;
 }
 
+const patchCatalog = createCatalog(allGeneratorDefinitions());
+
 function validateIntent(intent: SemanticIntent): string | null {
   if (!intent || typeof intent !== 'object') return 'invalid intent';
   if (intent.label !== undefined && typeof intent.label !== 'string') {
@@ -201,7 +206,10 @@ function validateIntent(intent: SemanticIntent): string | null {
   if (intent.seed !== undefined && typeof intent.seed !== 'string') {
     return 'intent.seed must be a string';
   }
-  // patch shape is trusted when present (full validation is for recordings)
+  if (intent.patch !== undefined) {
+    const result = gatePatchProposal(intent.patch, patchCatalog);
+    if (!result.ok) return result.issues.map((issue) => issue.message).join('; ');
+  }
   return null;
 }
 
