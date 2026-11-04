@@ -98,6 +98,7 @@ export class AudioEngine {
   /** Whether {@link frame} has ever been computed (vs. the initial silent state). */
   private frameValid = false;
 
+  private startId = 0;
   private _running = false;
   private _error: string | null = null;
 
@@ -115,7 +116,8 @@ export class AudioEngine {
    */
   async start(deviceId?: string): Promise<boolean> {
     this._error = null;
-    if (this._running) this.stop();
+    this.stop();
+    const startId = this.startId;
 
     if (!navigator.mediaDevices?.getUserMedia) {
       this._error = 'This browser does not support audio capture.';
@@ -133,11 +135,20 @@ export class AudioEngine {
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
+      if (startId !== this.startId) {
+        for (const track of stream.getTracks()) track.stop();
+        return false;
+      }
+      this.stream = stream;
+
       const audioCtx = new AudioContext();
+      this.audioCtx = audioCtx;
       // A user gesture is usually required; resume just in case it starts suspended.
       if (audioCtx.state === 'suspended') {
         await audioCtx.resume();
       }
+
+      if (startId !== this.startId) return false;
 
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = FFT_SIZE;
@@ -147,8 +158,6 @@ export class AudioEngine {
       source.connect(analyser);
       // Intentionally NOT connected to audioCtx.destination — no feedback.
 
-      this.stream = stream;
-      this.audioCtx = audioCtx;
       this.analyser = analyser;
       this.source = source;
 
@@ -157,8 +166,10 @@ export class AudioEngine {
       this._running = true;
       return true;
     } catch (err) {
-      this._error = this.describeError(err);
-      this.stop();
+      if (startId === this.startId) {
+        this._error = this.describeError(err);
+        this.stop();
+      }
       return false;
     }
   }
@@ -172,6 +183,7 @@ export class AudioEngine {
 
   /** Stop capture, release the microphone track, and close the context. */
   stop(): void {
+    this.startId++;
     this._running = false;
     this.source?.disconnect();
     this.source = null;
