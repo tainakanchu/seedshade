@@ -1,3 +1,4 @@
+import { sanitizeId } from './gl/assemble';
 import type { GeneratorCatalog } from './catalog';
 import type { GeneratorCategory, ParameterDefinition, VisualOperator, VisualPatch } from './types';
 
@@ -237,10 +238,10 @@ export function validatePatch(patch: VisualPatch, catalog: GeneratorCatalog): Va
   for (let i = 0; i < operators.length; i++) {
     const op = operators[i]!;
     const path = `operators[${i}]`;
-    if (seenIds.has(op.id)) {
+    if (seenIds.has(sanitizeId(op.id))) {
       issues.push(issue('duplicate_operator_id', `duplicate operator id "${op.id}"`, path));
     } else {
-      seenIds.add(op.id);
+      seenIds.add(sanitizeId(op.id));
       opById.set(op.id, op);
     }
   }
@@ -416,22 +417,11 @@ export function validatePatch(patch: VisualPatch, catalog: GeneratorCatalog): Va
     const source = route.source;
     if (source === 'time' || AUDIO_SOURCES.has(source) || SWELL_SOURCES.has(source)) {
       // ok
-    } else if (source.startsWith('operator:')) {
-      const sourceOpId = source.slice('operator:'.length);
-      if (!sourceOpId || !opById.has(sourceOpId)) {
-        issues.push(
-          issue(
-            'invalid_source',
-            `route source operator "${sourceOpId}" does not exist`,
-            `${basePath}.source`,
-          ),
-        );
-      }
     } else {
       issues.push(
         issue(
           'invalid_source',
-          `route source "${source}" is not a known form (audio:*, swell:*, time, operator:<opId>)`,
+          `route source "${source}" is not a known form (audio:*, swell:*, time)`,
           `${basePath}.source`,
         ),
       );

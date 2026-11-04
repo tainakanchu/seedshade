@@ -122,6 +122,20 @@ function codes(patch: VisualPatch = validPatch()) {
 }
 
 describe('synth/validate', () => {
+  it('rejects cross-operator sources unsupported by the engine', () => {
+    const patch = validPatch();
+    patch.routes[0]!.source = 'operator:src';
+    expect(codes(patch)).toContain('invalid_source');
+  });
+
+  it('rejects operator ids that collide after GLSL sanitization', () => {
+    const patch = validPatch();
+    patch.operators[0]!.id = 'a-b';
+    patch.operators[1]!.id = 'a_b';
+    patch.routes = [];
+    expect(codes(patch)).toContain('duplicate_operator_id');
+  });
+
   describe('rule1: operator ids unique', () => {
     it('pass: unique ids', () => {
       expect(codes()).not.toContain('duplicate_operator_id');
@@ -588,13 +602,6 @@ describe('synth/validate', () => {
             amount: 0.2,
             polarity: 'unipolar',
             smoothing: 0.05,
-          },
-          {
-            source: 'operator:src',
-            target: 'mod.count',
-            amount: 1,
-            polarity: 'unipolar',
-            smoothing: 0,
           },
         ],
       });

@@ -1,5 +1,5 @@
 import type { GeneratorCatalog } from './catalog';
-import { estimateCost, fitsBudget } from './cost';
+import { DEFAULT_BUDGETS, estimateCost, fitsBudget } from './cost';
 import { parsePatch } from './schema';
 import type { RenderBudget, VisualPatch } from './types';
 import { type ValidationIssue, validatePatch } from './validate';
@@ -14,7 +14,7 @@ export interface ProposalResult {
 export function gatePatchProposal(
   input: unknown,
   catalog: GeneratorCatalog,
-  budget: RenderBudget,
+  budget?: RenderBudget,
 ): ProposalResult {
   const parsed = parsePatch(input);
   if (!parsed.ok) {
@@ -29,7 +29,10 @@ export function gatePatchProposal(
     return { ok: false, issues: validationIssues };
   }
 
-  const budgetIssues = fitsBudget(estimateCost(parsed.patch, catalog), budget);
+  const budgetIssues = fitsBudget(
+    estimateCost(parsed.patch, catalog),
+    budget ?? DEFAULT_BUDGETS[parsed.patch.qualityTier],
+  );
   if (budgetIssues.length > 0) {
     return { ok: false, issues: budgetIssues };
   }

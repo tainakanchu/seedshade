@@ -17,7 +17,6 @@ import {
   registerSynthControl,
   type SynthControlBackend,
 } from '../synth/control';
-import { DEFAULT_BUDGETS } from '../synth/cost';
 import { derivePatch } from '../synth/derive';
 import { assemblePatch, SEED_UNIFORM, type AssembledShader } from '../synth/gl/assemble';
 import { createAudioTextureSet, type AudioTextureSet } from '../synth/gl/audioTextureGl';
@@ -44,7 +43,7 @@ import {
   serializeRecording,
 } from '../synth/recording';
 import { namespaceToU32, seedToU32 } from '../synth/rng';
-import { parsePatch, serializePatch } from '../synth/schema';
+import { serializePatch } from '../synth/schema';
 import {
   applyOp,
   collectDue,
@@ -662,7 +661,9 @@ function handleDue(d: DueEvent): void {
 
   const { patch, seed } = d.event.intent;
   if (patch) {
-    pendingTarget = { seed: patch.seed, patch, spec: d.event.transition };
+    const result = gatePatchProposal(patch, metaCatalog);
+    if (!result.ok || !result.patch) return;
+    pendingTarget = { seed: result.patch.seed, patch: result.patch, spec: d.event.transition };
     return;
   }
   if (seed !== undefined) {
@@ -896,12 +897,7 @@ const control: SynthControlBackend = {
   },
 
   proposePatch(input: unknown) {
-    // The budget is per quality tier, so the tier has to be read off the input
-    // before the gate can be handed one.
-    const parsed = parsePatch(input);
-    if (!parsed.ok) return { ok: false, issues: parsed.issues };
-
-    const result = gatePatchProposal(input, metaCatalog, DEFAULT_BUDGETS[parsed.patch.qualityTier]);
+    const result = gatePatchProposal(input, metaCatalog);
     if (!result.ok || !result.patch) {
       return { ok: false, issues: result.issues.map((i) => i.message) };
     }
@@ -993,13 +989,18 @@ const control: SynthControlBackend = {
     const parsed = parseRecording(raw);
     if (!parsed.ok) return { ok: false, issues: parsed.issues };
 
+    const result = gatePatchProposal(parsed.rec.initialPatch, metaCatalog);
+    if (!result.ok || !result.patch) {
+      return { ok: false, issues: result.issues.map((issue) => issue.message) };
+    }
+
     timeline = replayTimeline(parsed.rec, Number.POSITIVE_INFINITY);
     scheduler = createSchedulerState();
     // Rewind the visuals too: the recorded events were authored against this
     // patch, so replaying from anywhere else would drift immediately.
     pendingTarget = {
-      seed: parsed.rec.initialPatch.seed,
-      patch: parsed.rec.initialPatch,
+      seed: result.patch.seed,
+      patch: result.patch,
       spec: DEFAULT_TRANSITION,
     };
     notifySynthControlChanged();
