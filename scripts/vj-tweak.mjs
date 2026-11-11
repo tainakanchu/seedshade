@@ -21,23 +21,14 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CATEGORY_RANK, validatePatchLocal } from './vj-patch-validation.mjs';
+export { CATEGORY_RANK, COUNT_LIMITS } from './vj-patch-validation.mjs';
 
 /** vj-ctl.mjs の実体。同じ scripts/ ディレクトリに並ぶ前提で相対解決する。env で上書き可能。 */
 const VJ_CTL_PATH = process.env.VJ_CTL_PATH ?? `${import.meta.dirname}/vj-ctl.mjs`;
 
 /** catalog キャッシュはスクリプト自身と同じディレクトリに置く（scratch dir は毎回同じ場所）。 */
 const CATALOG_CACHE_PATH = `${import.meta.dirname}/.vj-catalog-cache.json`;
-
-// 由来: src/synth/validate.ts の CATEGORY_RANK / COUNT_LIMITS をそのまま複製したもの
-// （CLI は .ts を import できないため）。サーバ側のゲートと食い違えると
-// 「ローカルは通ったのにサーバで弾かれる」が起きるので、値は必ず一致させること。
-export const CATEGORY_RANK = { source: 0, field: 1, modifier: 2, material: 3 };
-export const COUNT_LIMITS = {
-  source: { min: 1, max: 2 },
-  field: { min: 0, max: 2 },
-  modifier: { min: 1, max: 3 },
-  material: { min: 1, max: 1 },
-};
 
 /** 由来: src/synth/derive.ts の pickOperatorsForCategory が使う id 命名規則（`${prefix}${n}`）。 */
 export const CATEGORY_PREFIX = { source: 'src', field: 'fld', modifier: 'mod', material: 'mat' };
@@ -621,27 +612,10 @@ export function reconcileRoutes(draft, catalogMap) {
 // patch 全体の検証（トークン単位ではなく draft 全体に対するチェック）
 // ---------------------------------------------------------------------------
 
-/**
- * 由来: src/synth/validate.ts のステージ本数チェック / palette.mode チェックをローカルに
- * 複製したもの。個々のトークンとは無関係に、送る draft 全体に対して毎回走らせる。
- */
 export function runPatchLevelChecks(draft, catalogMap, errors) {
-  for (const [category, limits] of Object.entries(COUNT_LIMITS)) {
-    const ids = draft.operators
-      .filter((op) => catalogMap.get(op.generatorId)?.category === category)
-      .map((op) => op.id);
-    if (ids.length < limits.min || ids.length > limits.max) {
-      const idsText = ids.length > 0 ? ` (ids: ${ids.join(', ')})` : '';
-      errors.push(
-        `[patch] ${category} count must be ${limits.min}-${limits.max}, got ${ids.length}${idsText}`,
-      );
-    }
-  }
-  if (!PALETTE_MODES.includes(draft.palette.mode)) {
-    errors.push(
-      `[patch] palette.mode "${draft.palette.mode}" is not a valid mode (valid: ${PALETTE_MODES.join(', ')})`,
-    );
-  }
+  errors.push(
+    ...validatePatchLocal(draft, [...catalogMap.values()]).map((issue) => `[patch] ${issue}`),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -723,15 +697,7 @@ async function main() {
     // palette / composition を新しい seed で引き直す。<change> トークンや --seed
     // より必ず先に効かせる（reroll してから手直し、の順で上から上書きされる）。
     //
-    // ここだけ src/synth/derive.ts の本物の rerollPatch を呼ぶ必要がある
-    // （このファイルの他の検証はすべて validate.ts のローカル複製だが、rerollPatch は
-    // 複製が許されない生成ロジックそのものなので複製しない）。CLI は .ts を直接
-    // import できないので、scripts/vj-validate.mjs と同じ手法（Vite の SSR モジュール
-    // ローダー）で src/synth/derive.ts と src/synth/generators/index.ts を実行する。
-    // これは重い（createServer だけで数百ms〜数秒）ので、--reroll を使わない
-    // 呼び出しではこの分岐に一切入らず、import ("vite") 自体も動的 import でこの
-    // 分岐の中でしか評価しない — トップレベルで `import { createServer } from 'vite'`
-    // すると、--reroll を使わない大多数の呼び出しまで毎回この起動コストを払うことになる。
+    // reroll も Vite SSR で本物の生成ロジックを実行する。
     if (rerollRequested) {
       const { createServer } = await import('vite');
       const root = resolve(import.meta.dirname, '..');
