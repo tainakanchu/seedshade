@@ -181,9 +181,49 @@ function writePatchFile(dir, name, patch) {
 }
 
 describe('vj-set.mjs load', () => {
+  it.each(['cross-operator source', 'sanitized ID collision'])(
+    'rejects %s before sending any scene',
+    (kind) => {
+      const patch = fixturePatch(0);
+      if (kind === 'cross-operator source') {
+        patch.routes = [
+          {
+            source: 'operator:mod0',
+            target: 'src0.amount',
+            amount: 0.1,
+            polarity: 'unipolar',
+            smoothing: 0,
+          },
+        ];
+      } else {
+        patch.operators[0].id = 'op-0';
+        patch.operators[1].id = 'op_0';
+      }
+      writePatchFile(tmpDir, 's1.json', patch);
+      const setPath = writeSetFile(tmpDir, 'set.json', {
+        name: 'invalid',
+        scenes: [{ cue: 's1', patch: 's1.json' }],
+      });
+      const result = runVjSet(['load', setPath, '--refresh-catalog']);
+      expect(result.status).toBe(1);
+      expect(JSON.parse(result.stdout).issues.join(' ')).toContain(
+        kind === 'cross-operator source' ? 'is not a known form' : 'duplicate operator id',
+      );
+      expect(readCallLog().map((call) => call.command)).toEqual(['catalog']);
+    },
+  );
+
   it('swell:group の modulation route を含むセットを読み込める', () => {
     const patch = fixturePatch(0);
-    patch.routes = [{ source: 'swell:group', target: 'src0.amount', amount: 0.5, smoothing: 0.1 }];
+    patch.routes = [
+      {
+        source: 'swell:group',
+        target: 'src0.amount',
+        amount: 0.5,
+        polarity: 'unipolar',
+        smoothing: 0.1,
+      },
+    ];
     writePatchFile(tmpDir, 's1.json', patch);
     const setPath = writeSetFile(tmpDir, 'set.json', {
       name: 'swell-set',

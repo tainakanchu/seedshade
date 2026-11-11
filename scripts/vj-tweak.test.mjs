@@ -156,13 +156,12 @@ describe('vj-tweak.mjs route reconciliation', () => {
     expect(result.stderr).toMatch(/mod1/);
   });
 
-  it('leaves routes untouched when no operator is swapped or deleted', () => {
+  it('rejects a surviving cross-operator modulation source', () => {
     const result = runVjTweak(['src0.amount=0.9']);
 
-    expect(result.status).toBe(0);
-    const draft = JSON.parse(result.stdout);
-    expect(draft.routes).toHaveLength(3);
-    expect(result.stderr).not.toMatch(/dropping route/);
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.stdout).ok).toBe(false);
+    expect(result.stderr).toContain('route source "operator:mod1" is not a known form');
   });
 });
 
