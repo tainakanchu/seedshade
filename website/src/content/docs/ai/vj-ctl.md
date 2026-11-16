@@ -15,6 +15,7 @@ description: 1 命令ずつ叩く基本の CLI。状態の取得、シード / P
 | `seed <seed>` | そのシードの見た目へ **今すぐ** 遷移 |
 | `patch <file.json>` | Patch の JSON を **今すぐ** 適用（検証に落ちると issues が返る） |
 | `image <file> [--name <n>]` | 画像（png / jpg / webp / gif / svg / avif、5MB まで）を登録。返ってくる `hash` を Patch の `images` に入れて使う |
+| `text <opId[.slot]> [<文字列>] [--font <css>] [--weight <n>]` | 文字ノード（`type` 系）の文字を差し替える。`\n` は改行、文字列を省略すると解除（[文字ノード](../../guide/type-nodes/)） |
 | `event add …` | Timeline にイベントを予約（下記） |
 | `event remove <id>` | 予約を取り消す |
 | `lock <sec>` | 今から N 秒間、Timeline をロック（相対指定） |

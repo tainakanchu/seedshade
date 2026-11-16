@@ -79,6 +79,7 @@ function stubControl(
     proposePatch: () => ({ ok: true, issues: [] }),
     proposeSeed: () => {},
     setImage: async () => ({ ok: true, issues: [] }),
+    setText: () => ({ ok: true, issues: [] }),
     applyTimelineOp,
     fireExternal: () => {},
     startRecording: () => {},

@@ -1,5 +1,6 @@
 import type { PerformanceTimeline, TimelineOp } from './timeline';
-import type { VisualPatch } from './types';
+import { DEFAULT_TEXT_FONT, DEFAULT_TEXT_WEIGHT } from './texts';
+import type { TextSpec, VisualPatch } from './types';
 
 /**
  * External Control Interface — the first implementation of the RFC's control
@@ -60,6 +61,53 @@ export interface SetImageResult {
   name?: string;
 }
 
+/** setText の入力。font / weight を省くと既存の割り当て（無ければ既定値）を引き継ぐ。 */
+export interface SetTextInput {
+  text: string;
+  font?: string;
+  weight?: number;
+}
+
+/** スロット名を省いたキー（`"type0"`）に補うスロット。type 系 Generator の唯一のスロット。 */
+export const DEFAULT_TEXT_SLOT = 'text';
+
+/** `"<opId>"` だけなら既定スロットを補って `"<opId>.text"` にする。 */
+export function normalizeTextKey(key: string): string {
+  const trimmed = key.trim();
+  return trimmed.includes('.') ? trimmed : `${trimmed}.${DEFAULT_TEXT_SLOT}`;
+}
+
+/**
+ * Patch の texts を 1 エントリだけ差し替えた新しい Patch を返す（純関数）。
+ *
+ * - input が null ならそのキーを消す。最後の 1 つが消えたら texts ごと省く
+ *   （文字を使わない Patch は従来どおりの JSON に戻る）。
+ * - font / weight を省いた入力は、既存エントリ → 既定値の順で埋める。
+ *
+ * スロットが実在するかはここでは見ない（proposePatch の検証ゲートが判定する）。
+ */
+export function patchWithText(
+  patch: VisualPatch,
+  key: string,
+  input: SetTextInput | null,
+): VisualPatch {
+  const k = normalizeTextKey(key);
+  const texts: Record<string, TextSpec> = { ...patch.texts };
+  if (input === null) {
+    delete texts[k];
+  } else {
+    const prev = texts[k];
+    texts[k] = {
+      text: input.text,
+      font: input.font ?? prev?.font ?? DEFAULT_TEXT_FONT,
+      weight: input.weight ?? prev?.weight ?? DEFAULT_TEXT_WEIGHT,
+    };
+  }
+  const { texts: _drop, ...rest } = patch;
+  void _drop;
+  return Object.keys(texts).length > 0 ? { ...rest, texts } : rest;
+}
+
 export interface SynthControl {
   getState(): SynthControlState;
   /** gatePatchProposal を通してから適用する。issues が空なら遷移が始まる。 */
@@ -74,6 +122,15 @@ export interface SynthControl {
    * ハッシュ計算と decode が非同期なので、control のなかでここだけ Promise を返す。
    */
   setImage(name: string, bytesBase64: string, mime: string): Promise<SetImageResult>;
+  /**
+   * 今の Patch のテキストスロット（`"<opId>.<slot>"`、スロット省略時は `.text`）に
+   * 文字列を割り当てる（null で割り当て解除）。Bridge 経由の `vj-ctl text` の受け口。
+   *
+   * 中身は「texts だけ差し替えた Patch を proposePatch する」のと同じで、検証
+   * ゲートも同じものを通る。operators は変えないのでトポロジ変更にはならず、
+   * シェーダは再コンパイルされない（テクスチャの再アップロードだけ）。
+   */
+  setText(key: string, input: SetTextInput | null): { ok: boolean; issues: string[] };
   applyTimelineOp(op: TimelineOp): { ok: boolean; issue?: string };
   fireExternal(id: string): void;
   startRecording(): void;
@@ -85,8 +142,19 @@ export interface SynthControl {
   subscribe(listener: () => void): () => void;
 }
 
-/** シーンが登録する実体。subscribe はレジストリ（facade）側が持つ。 */
-export type SynthControlBackend = Omit<SynthControl, 'subscribe'>;
+/**
+ * シーンが登録する実体。subscribe はレジストリ（facade）側が持つ。setText も
+ * getState + proposePatch だけで組めるので facade 側が持つ（シーンは実装不要）。
+ */
+export type SynthControlBackend = Omit<SynthControl, 'subscribe' | 'setText'> & {
+  /**
+   * 今いちばん新しい遷移先（キュー済みの提案 → ロード中 / クロスフェード中の
+   * 行き先 → 画面の Patch の順）。setText はこれを土台にする。currentPatch を
+   * 土台にすると、切り替え途中に文字を打った瞬間に古い Patch へ巻き戻るため。
+   * 省略時は getState().currentPatch。
+   */
+  targetPatch?(): VisualPatch | null;
+};
 
 const NO_SCENE = 'no synth scene is active';
 
@@ -157,6 +225,16 @@ const facade: SynthControl = {
     return active
       ? active.setImage(name, bytesBase64, mime)
       : Promise.resolve({ ok: false, issues: [NO_SCENE] });
+  },
+
+  setText(key: string, input: SetTextInput | null): { ok: boolean; issues: string[] } {
+    if (!active) return { ok: false, issues: [NO_SCENE] };
+    if (normalizeTextKey(key).startsWith('.')) {
+      return { ok: false, issues: ['text key must be "<opId>" or "<opId>.<slot>"'] };
+    }
+    const current = active.targetPatch?.() ?? active.getState().currentPatch;
+    if (!current) return { ok: false, issues: ['no patch is on screen yet'] };
+    return active.proposePatch(patchWithText(current, key, input));
   },
 
   applyTimelineOp(op: TimelineOp): { ok: boolean; issue?: string } {

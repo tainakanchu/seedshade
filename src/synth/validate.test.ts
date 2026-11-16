@@ -63,6 +63,8 @@ const materialGen = def({ id: 'gen-material', category: 'material', output: 'col
 
 /** Source with a texture input slot — the shape stamp has. */
 const texturedGen = def({ id: 'gen-textured', category: 'source', textures: ['image'] });
+/** Source with a text input slot — the shape type has. */
+const textGen = def({ id: 'gen-text', category: 'source', textSlots: ['text'] });
 
 const catalog = createCatalog([
   sourceGen,
@@ -74,6 +76,7 @@ const catalog = createCatalog([
   modifierGen3,
   materialGen,
   texturedGen,
+  textGen,
   def({ id: 'gen-v2', category: 'source', version: 2 }),
 ]);
 
@@ -780,6 +783,56 @@ describe('synth/validate', () => {
       const issues = validatePatch(patch, catalog);
       expect(issues.map((i) => i.code)).toContain('unknown_texture_slot');
       expect(issues.find((i) => i.code === 'unknown_texture_slot')?.path).toBe('images.src.image');
+    });
+  });
+
+  describe('rule12: text assignments', () => {
+    const spec = { text: 'HELLO', font: 'sans-serif', weight: 700 };
+
+    function textPatch(texts?: VisualPatch['texts']): VisualPatch {
+      const base = validPatch();
+      return {
+        ...base,
+        operators: [{ ...base.operators[0]!, generatorId: 'gen-text' }, ...base.operators.slice(1)],
+        ...(texts ? { texts } : {}),
+      };
+    }
+
+    it('pass: text points at a declared text slot', () => {
+      expect(validatePatch(textPatch({ 'src.text': spec }), catalog)).toEqual([]);
+    });
+
+    it('pass: a declared text slot may stay unassigned', () => {
+      expect(validatePatch(textPatch(), catalog)).toEqual([]);
+    });
+
+    it('fail: key is not "<opId>.<slot>" / operator missing', () => {
+      expect(codes(textPatch({ src: spec }))).toContain('invalid_text_key');
+      expect(codes(textPatch({ 'nope.text': spec }))).toContain('invalid_text_key');
+    });
+
+    it('fail: text aimed at an undeclared slot', () => {
+      expect(codes(textPatch({ 'src.title': spec }))).toContain('unknown_text_slot');
+    });
+
+    it('fail: text aimed at an image slot (namespaces are separate)', () => {
+      const base = validPatch();
+      const patch: VisualPatch = {
+        ...base,
+        operators: [
+          { ...base.operators[0]!, generatorId: 'gen-textured' },
+          ...base.operators.slice(1),
+        ],
+        texts: { 'src.image': spec },
+      };
+      const issues = validatePatch(patch, catalog);
+      expect(issues.find((i) => i.code === 'unknown_text_slot')?.path).toBe('texts.src.image');
+    });
+
+    it('fail: image aimed at a text slot', () => {
+      const patch = textPatch();
+      patch.images = { 'src.text': { name: 'l.png', hash: 'deadbeef' } };
+      expect(codes(patch)).toContain('unknown_texture_slot');
     });
   });
 

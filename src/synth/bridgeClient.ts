@@ -186,6 +186,35 @@ function dispatch(
         .then((result) => ok(result));
     }
 
+    case 'setText': {
+      // params: { key: "<opId>[.<slot>]", text?: string, font?: string, weight?: number,
+      //           clear?: boolean }。clear: true（または text 省略）で割り当て解除。
+      const key = params?.key;
+      if (typeof key !== 'string' || key.trim() === '') {
+        return fail('setText requires params.key as "<opId>" or "<opId>.<slot>"');
+      }
+      const text = params?.text;
+      const font = params?.font;
+      const weight = params?.weight;
+      if (params?.clear === true || text === undefined) {
+        return ok(control.setText(key, null));
+      }
+      if (typeof text !== 'string') return fail('setText requires params.text as string');
+      if (font !== undefined && typeof font !== 'string') {
+        return fail('setText params.font must be a string');
+      }
+      if (weight !== undefined && typeof weight !== 'number') {
+        return fail('setText params.weight must be a number');
+      }
+      return ok(
+        control.setText(key, {
+          text,
+          ...(font !== undefined ? { font } : {}),
+          ...(weight !== undefined ? { weight } : {}),
+        }),
+      );
+    }
+
     case 'applyTimelineOp': {
       const op = params?.op;
       if (typeof op !== 'object' || op === null) {

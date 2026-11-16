@@ -19,6 +19,7 @@ const control = vi.hoisted(() => ({
   getState: vi.fn(),
   proposePatch: vi.fn(),
   proposeSeed: vi.fn(),
+  setText: vi.fn(),
   applyTimelineOp: vi.fn(),
   fireExternal: vi.fn(),
   startRecording: vi.fn(),
@@ -359,6 +360,38 @@ describe('handleBridgeMessage', () => {
     const res = handleBridgeMessage('{"id":1,"method":"proposePatch","params":{"patch":{"a":1}}}');
     expect(control.proposePatch).toHaveBeenCalledWith({ a: 1 });
     expect(res).toEqual({ id: 1, result: { ok: false, issues: ['bad'] } });
+  });
+
+  it('routes setText with text / font / weight', () => {
+    control.setText.mockReturnValue({ ok: true, issues: [] });
+    const res = handleBridgeMessage(
+      '{"id":20,"method":"setText","params":{"key":"type0","text":"HELLO","font":"serif","weight":900}}',
+    );
+    expect(control.setText).toHaveBeenCalledWith('type0', {
+      text: 'HELLO',
+      font: 'serif',
+      weight: 900,
+    });
+    expect(res).toEqual({ id: 20, result: { ok: true, issues: [] } });
+  });
+
+  it('routes setText without font / weight (inherit) and with clear', () => {
+    control.setText.mockReturnValue({ ok: true, issues: [] });
+    void handleBridgeMessage('{"id":21,"method":"setText","params":{"key":"t.text","text":"A"}}');
+    expect(control.setText).toHaveBeenLastCalledWith('t.text', { text: 'A' });
+    void handleBridgeMessage('{"id":22,"method":"setText","params":{"key":"t.text","clear":true}}');
+    expect(control.setText).toHaveBeenLastCalledWith('t.text', null);
+  });
+
+  it('rejects setText with a missing key or a non-string text', () => {
+    expect(handleBridgeMessage('{"id":23,"method":"setText","params":{"text":"A"}}')).toEqual({
+      id: 23,
+      error: expect.stringContaining('params.key') as unknown,
+    });
+    expect(
+      handleBridgeMessage('{"id":24,"method":"setText","params":{"key":"t","text":5}}'),
+    ).toEqual({ id: 24, error: expect.stringContaining('params.text') as unknown });
+    expect(control.setText).not.toHaveBeenCalled();
   });
 
   it('routes proposeSeed', () => {

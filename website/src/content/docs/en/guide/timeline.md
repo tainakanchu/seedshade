@@ -97,6 +97,10 @@ You can put an image such as a logo into the visuals.
 - A Patch holds at most 2 Sources, so if there are already 2, the last Source is removed and replaced with `stamp`.
 - `stamp` is never chosen by seed gacha. Redrawing the seed removes the image, so press **stamp に使う** again.
 
+## Texts (add text)
+
+In the **Texts** section below Images, press `+ type` / `+ mask` / `+ warp` to add a type node to the Patch. Editing the text, font and weight happens here too. See [Type nodes](../type-nodes/) for details.
+
 ## Recording
 
 1. Press **● Record** to start recording. Subsequent Timeline operations (adding and deleting events, etc.) and firings are recorded.

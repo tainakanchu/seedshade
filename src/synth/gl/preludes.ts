@@ -76,8 +76,57 @@ vec2 rot2(vec2 p, float a) {
 }
 `;
 
+/**
+ * 文字ノード（type / typeMask / typeWarp）が共有する配置と SDF 読み出し。
+ *
+ * テクスチャの中身の約束は `../texts.ts` の冒頭（R = SDF で 0.5 が輪郭、G = 文字
+ * インデックス / 文字数、B = グリフ内の横位置、A = 1。未割り当ては透明ダミーで
+ * A = 0）。配置は stamp と同じ p 空間の fit / scale の考え方だが、tile は
+ * 「contain の大きさで敷き詰める」にしてある（横長の 1 行テキストを高さ 1 で
+ * 敷くと画面からはみ出して 1 枚にしか見えないため）。
+ *
+ * uRes を読むので、ヘッダの uniform 宣言より後（= プリリュードの位置）に置く。
+ */
+const TYPE_LAYOUT_GLSL = /* glsl */ `
+// ---- prelude: typeLayout (text-slot placement + SDF reads) ----
+// fit: 0 = contain, 1 = cover, 2 = tile. Returns the uv into the text raster;
+// mask = 1 inside the placed box (tile: everywhere), 0 outside.
+vec2 typePlace(vec2 p, vec2 texSize, int fit, float scale, out float mask, out vec2 extent) {
+  vec2 size = max(texSize, vec2(1.0));
+  float imgAspect = size.x / size.y;
+  float canvasAspect = uRes.x / max(uRes.y, 1.0);
+  float h = (fit == 1) ? max(1.0, canvasAspect / imgAspect) : min(1.0, canvasAspect / imgAspect);
+  h *= max(scale, 1e-3);
+  extent = vec2(max(h * imgAspect, 1e-4), max(h, 1e-4));
+  vec2 uv = p / extent + 0.5;
+  if (fit == 2) {
+    mask = 1.0;
+    return fract(uv);
+  }
+  vec2 inside = step(vec2(0.0), uv) * step(uv, vec2(1.0));
+  mask = inside.x * inside.y;
+  return uv;
+}
+
+// Coverage of the glyph shape for an SDF sample. weight (-1..1) moves the
+// threshold (bolder / thinner), softness (0..1) widens the edge, outline (0..1)
+// turns the fill into a band of that width around the threshold.
+float typeCoverage(float sdf, float weight, float softness, float outline) {
+  float th = 0.5 - clamp(weight, -1.0, 1.0) * 0.35;
+  float aa = max(fwidth(sdf) * 0.75, 1e-4) + clamp(softness, 0.0, 1.0) * 0.25;
+  float fill = smoothstep(th - aa, th + aa, sdf);
+  float w = clamp(outline, 0.0, 1.0) * 0.3;
+  float band = 1.0 - smoothstep(w - aa, w + aa, abs(sdf - th));
+  // Crossfade instead of branching so a modulated outline never pops at 0.
+  return mix(fill, band, smoothstep(0.0, 0.04, outline));
+}
+`;
+
 /** キー → GLSL。Map なので get() が `string | undefined` になり、未知キーを型で拾える。 */
-const PRELUDE_SOURCES: ReadonlyMap<string, string> = new Map([['sdf3d', SDF3D_GLSL]]);
+const PRELUDE_SOURCES: ReadonlyMap<string, string> = new Map([
+  ['sdf3d', SDF3D_GLSL],
+  ['typeLayout', TYPE_LAYOUT_GLSL],
+]);
 
 /** 登録済みプリリュードキー（宣言順）。 */
 export function knownPreludeKeys(): string[] {

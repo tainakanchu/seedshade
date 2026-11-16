@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { CURRENT_SCHEMA_VERSION, migratePatch, parsePatch, serializePatch } from './schema';
+import {
+  CURRENT_SCHEMA_VERSION,
+  FONT_WEIGHT_MAX,
+  FONT_WEIGHT_MIN,
+  migratePatch,
+  parsePatch,
+  serializePatch,
+  TEXT_MAX_LENGTH,
+} from './schema';
 import type { VisualPatch } from './types';
 
 function basePatch(overrides: Partial<VisualPatch> = {}): VisualPatch {
@@ -278,6 +286,61 @@ describe('synth/schema', () => {
         basePatch({ images: { 'src1.image': { name: '', hash: 'f0' } } }),
       );
       expect(emptyName.ok).toBe(false);
+    });
+  });
+  describe('texts (任意フィールド)', () => {
+    const texts = {
+      'src1.text': { text: '祭\nFEST', font: '"Noto Sans JP", sans-serif', weight: 800 },
+    };
+
+    it('texts 無しの Patch は今までどおり通り、キーも生えない', () => {
+      const parsed = parsePatch(basePatch());
+      expect(parsed.ok && 'texts' in parsed.patch).toBe(false);
+      expect(serializePatch(basePatch())).not.toContain('texts');
+    });
+
+    it('texts 付きの Patch を parse して文字列がそのまま残る（ハッシュ化しない）', () => {
+      const parsed = parsePatch(basePatch({ texts }));
+      expect(parsed.ok).toBe(true);
+      expect(parsed.ok && parsed.patch.texts).toEqual(texts);
+      expect(parsed.ok && parsed.patch.schemaVersion).toBe(1);
+      expect(serializePatch(basePatch({ texts }))).toContain('"text":"祭\\nFEST"');
+    });
+
+    it('空文字列は許す（= 何も描かない）', () => {
+      const parsed = parsePatch(
+        basePatch({ texts: { 'src1.text': { text: '', font: 'serif', weight: 400 } } }),
+      );
+      expect(parsed.ok).toBe(true);
+    });
+
+    it(`長さ上限 ${TEXT_MAX_LENGTH} を超えると落ちる`, () => {
+      const at = parsePatch(
+        basePatch({
+          texts: { 'src1.text': { text: 'a'.repeat(TEXT_MAX_LENGTH), font: 'serif', weight: 400 } },
+        }),
+      );
+      expect(at.ok).toBe(true);
+      const over = parsePatch(
+        basePatch({
+          texts: {
+            'src1.text': { text: 'a'.repeat(TEXT_MAX_LENGTH + 1), font: 'serif', weight: 400 },
+          },
+        }),
+      );
+      expect(over.ok).toBe(false);
+    });
+
+    it('weight の範囲外・font 空・形の崩れは落ちる', () => {
+      for (const bad of [
+        { text: 'A', font: 'serif', weight: FONT_WEIGHT_MIN - 1 },
+        { text: 'A', font: 'serif', weight: FONT_WEIGHT_MAX + 1 },
+        { text: 'A', font: '', weight: 400 },
+        { text: 'A', weight: 400 },
+        { text: 5, font: 'serif', weight: 400 },
+      ]) {
+        expect(parsePatch(basePatch({ texts: { 'src1.text': bad as never } })).ok).toBe(false);
+      }
     });
   });
 });

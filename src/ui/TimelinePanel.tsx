@@ -14,6 +14,7 @@ import type {
 import type { ImageRef, TransitionPresetId, VisualOperator, VisualPatch } from '../synth/types';
 import { TRANSITION_PRESETS } from '../synth/types';
 import { randomSeed } from '../variation/generate';
+import { TextSlotsSection } from './TextSlotsSection';
 
 interface TimelinePanelProps {
   hidden: boolean;
@@ -689,6 +690,9 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
             </ul>
           )}
         </div>
+
+        {/* ---- Texts ---- */}
+        <TextSlotsSection control={control} patch={state.currentPatch} />
 
         {/* ---- Recording ---- */}
         <div className="tl-section">

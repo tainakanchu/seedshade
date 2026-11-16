@@ -77,6 +77,11 @@ export default defineConfig({
               translations: { en: "How Semantic Synth works", "zh-TW": "Semantic Synth 的原理" },
             },
             {
+              slug: "guide/type-nodes",
+              label: "文字ノード",
+              translations: { en: "Type nodes", "zh-TW": "文字節點" },
+            },
+            {
               slug: "guide/tempo",
               label: "テンポ同期（BPM）",
               translations: { en: "Tempo sync (BPM)", "zh-TW": "節拍同步（BPM）" },

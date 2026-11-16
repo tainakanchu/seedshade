@@ -83,6 +83,10 @@ const USAGE = `使い方: node scripts/vj-ctl.mjs <command> [options]
     MAX_IMAGE_BYTES / 1024 / 1024
   }MB）
                                返る hash を Patch の images["<opId>.image"] に入れて使う
+  text <opId[.slot]> [<文字列>] [--font <css font-family>] [--weight <100..900>]
+                               今の Patch の文字スロット（type / typeMask / typeWarp）に
+                               文字列を流し込む。スロット省略時は .text。"\\n" で改行。
+                               文字列を省くと割り当て解除。font / weight は省くと前回値を引き継ぐ
   event add --in <sec>|--bar <n>|--cue <id> [--seed <s>] [--patch <file>]
                                [--label <s>] [--transition default|slow|cut]
                                「N 秒後 / N 小節後に切り替える」、または external anchor
@@ -107,6 +111,7 @@ room 専用オプション:
   node scripts/vj-ctl.mjs state
   node scripts/vj-ctl.mjs seed "take-1"
   node scripts/vj-ctl.mjs image ./logo.png --name event-logo
+  node scripts/vj-ctl.mjs text type0 "SEED\\nSHADE" --weight 900
   node scripts/vj-ctl.mjs event add --in 30 --seed take-2 --transition slow
   node scripts/vj-ctl.mjs event add --bar 8 --patch /tmp/patch.json
   node scripts/vj-ctl.mjs event add --cue drop --patch /tmp/patch.json --label "drop"
@@ -380,6 +385,26 @@ async function run(conn, positional, flags) {
         result,
         { name, byteLength },
         '画像を登録できませんでした。issues を確認してください。',
+      );
+    }
+
+    case 'text': {
+      if (rest.length === 0) usageError('text には <opId[.slot]> が必要です');
+      const key = rest[0];
+      const params = { key };
+      if (rest.length > 1) {
+        // 複数の位置引数は空白でつなぐ。シェルで改行を渡しにくいので "\n" を改行に戻す。
+        params.text = rest.slice(1).join(' ').replace(/\\n/g, '\n');
+        if (flags.has('font')) params.font = flags.get('font');
+        if (flags.has('weight')) params.weight = numberFlag(flags, 'weight');
+      } else {
+        params.clear = true;
+      }
+      const result = await conn.request('setText', params);
+      return resultOut(
+        result,
+        { key },
+        '文字列を割り当てられませんでした。issues を確認してください（opId は state で確認できます）。',
       );
     }
 

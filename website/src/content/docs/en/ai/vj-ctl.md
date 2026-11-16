@@ -15,6 +15,7 @@ The examples below assume sending to the local relay (`pnpm bridge`). When sendi
 | `seed <seed>` | Transitions to that seed's look **right now** |
 | `patch <file.json>` | Applies a Patch JSON **right now** (issues are returned if validation fails) |
 | `image <file> [--name <n>]` | Registers an image (png / jpg / webp / gif / svg / avif, up to 5 MB). Put the returned `hash` in the Patch's `images` to use it |
+| `text <opId[.slot]> [<string>] [--font <css>] [--weight <n>]` | Replaces the text of a type node (`type` family). `\n` is a line break; omit the string to clear ([Type nodes](../../guide/type-nodes/)) |
 | `event add …` | Schedules an event on the Timeline (see below) |
 | `event remove <id>` | Cancels a scheduled event |
 | `lock <sec>` | Locks the Timeline for N seconds from now (relative) |
