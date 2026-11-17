@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { sanitizePinnedText, type PinnedText } from '../synth/pinnedText';
 
 export type HueMode = 'cycle' | 'fixed';
 export type Background = 'black' | 'transparent';
@@ -18,6 +19,16 @@ export interface Settings {
   deviceId: string;
   /** "Look gacha" seed: drives the deterministic visual variation. */
   seed: string;
+  /**
+   * Texts section "Link": editing any text slot writes the same text / font /
+   * weight to every text slot of the patch, and new text nodes start from it.
+   */
+  textLink: boolean;
+  /**
+   * Text nodes pinned across the seed gacha (synth/pinnedText.ts). The runtime
+   * copy lives in that module's store; App mirrors it here to persist it.
+   */
+  pinnedText: PinnedText | null;
 }
 
 const STORAGE_KEY = 'seedshade-settings';
@@ -34,6 +45,8 @@ const DEFAULT_SETTINGS: Settings = {
   gachaBars: 32,
   deviceId: '',
   seed: 'neon-prism-001',
+  textLink: true,
+  pinnedText: null,
 };
 
 /** Trim, cap length, and fall back to the default for empty/invalid seeds. */
@@ -117,6 +130,8 @@ export function sanitizeSettings(s: Settings): Settings {
     gachaBars: clampInt(s.gachaBars, 1, 512, DEFAULT_SETTINGS.gachaBars),
     deviceId: typeof s.deviceId === 'string' ? s.deviceId : '',
     seed: sanitizeSeed(s.seed),
+    textLink: typeof s.textLink === 'boolean' ? s.textLink : DEFAULT_SETTINGS.textLink,
+    pinnedText: sanitizePinnedText(s.pinnedText),
   };
 }
 

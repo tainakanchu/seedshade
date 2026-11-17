@@ -44,7 +44,7 @@ export interface EmitContext {
   seedUniform: string;
   /**
    * slot → sampler2D uniform name (u_<opId>_tex_<slot>).
-   * def.textures で宣言したスロットのみ。未宣言のスロットを要求すると throw する。
+   * def.textures / def.textSlots で宣言したスロットのみ。未宣言のスロットを要求すると throw する。
    */
   texUniform: (slot: string) => string;
   /**

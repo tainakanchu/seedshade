@@ -208,6 +208,10 @@ function sampleSameTopology(
     // end. The key stays absent when the target has none, so texture-free
     // patches serialize exactly as before.
     ...(to.images ? { images: to.images } : {}),
+    // Texts follow the same rule. A text edit is a texture re-upload, never a
+    // topology change: sameTopology only looks at operators, so typing into a
+    // slot morphs (or cuts) in place without recompiling the shader.
+    ...(to.texts ? { texts: to.texts } : {}),
   };
 
   return {

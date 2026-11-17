@@ -18,6 +18,7 @@ import {
   type SynthControlBackend,
 } from '../synth/control';
 import { derivePatch } from '../synth/derive';
+import { applyPinnedText, getPinnedText } from '../synth/pinnedText';
 import { assemblePatch, SEED_UNIFORM, type AssembledShader } from '../synth/gl/assemble';
 import { createAudioTextureSet, type AudioTextureSet } from '../synth/gl/audioTextureGl';
 import { allGeneratorDefinitions, inlineCatalog } from '../synth/generators';
@@ -29,6 +30,7 @@ import {
   putImage,
   subscribeImages,
 } from '../synth/images';
+import { requestTextRaster, textSpecKey, TEXT_CACHE_MAX, type TextRaster } from '../synth/texts';
 import {
   applyModulation,
   createModulationEngine,
@@ -202,6 +204,12 @@ let dummyTexture: WebGLTexture | null = null;
 /** 解決できなかった参照。警告はキーごとに1回だけ出す（毎フレーム出さない）。 */
 const warnedImages = new Set<string>();
 let unsubscribeImages: (() => void) | null = null;
+/**
+ * TextSpec key → uploaded SDF texture. Same keying idea as textureCache: two
+ * slots with the same string / font / weight share one upload. A text edit
+ * only adds an entry here — the shader never changes (see synth/texts.ts).
+ */
+const textTextureCache = new Map<string, { tex: WebGLTexture; w: number; h: number }>();
 
 // ---- audio textures (spectrum / wave; see synth/audioTextures) ----
 /**
@@ -361,6 +369,66 @@ function resolveTexture(
   return { tex, w: record.width, h: record.height };
 }
 
+/** Upload a text SDF raster (already bottom-row-first, straight RGBA8). */
+function uploadTextTexture(gl: WebGL2RenderingContext, raster: TextRaster): WebGLTexture | null {
+  const tex = gl.createTexture();
+  if (!tex) return null;
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA,
+    raster.width,
+    raster.height,
+    0,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    raster.data,
+  );
+  // LINEAR on an SDF is exactly what makes it scale cleanly.
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  return tex;
+}
+
+/**
+ * Resolve a Patch text entry to an uploaded SDF texture, or null while the
+ * raster is not ready yet (font loading) or cannot be made (empty string).
+ */
+function resolveTextTexture(
+  gl: WebGL2RenderingContext,
+  spec: NonNullable<VisualPatch['texts']>[string],
+): { tex: WebGLTexture; w: number; h: number } | null {
+  const key = textSpecKey(spec);
+  const cached = textTextureCache.get(key);
+  if (cached) {
+    // Bump to most-recent so live typing evicts stale strings first.
+    textTextureCache.delete(key);
+    textTextureCache.set(key, cached);
+    return cached;
+  }
+  const raster = requestTextRaster(spec);
+  if (!raster) return null;
+  const tex = uploadTextTexture(gl, raster);
+  if (!tex) return null;
+  const entry = { tex, w: raster.width, h: raster.height };
+  textTextureCache.set(key, entry);
+  while (textTextureCache.size > TEXT_CACHE_MAX) {
+    const oldest = textTextureCache.keys().next().value;
+    if (oldest === undefined) break;
+    const old = textTextureCache.get(oldest);
+    // A slot still pointing at the evicted string simply re-uploads next frame.
+    if (old) gl.deleteTexture(old.tex);
+    textTextureCache.delete(oldest);
+  }
+  return entry;
+}
+
 /**
  * Bind one texture unit per declared slot, in the assembler's declaration order.
  * Unassigned or unresolvable slots get the transparent dummy so the draw always
@@ -376,9 +444,17 @@ function bindTextures(
 
   let unit = 0;
   for (const slot of assembled.textures) {
-    const ref = patch.images?.[slot.key];
-    if (!ref) warnMissingImage(slot.key, 'no image assigned');
-    const resolved = ref ? resolveTexture(gl, slot.key, ref) : null;
+    let resolved: { tex: WebGLTexture; w: number; h: number } | null;
+    if (slot.source === 'text') {
+      // No warning for an empty text slot: typing starts from nothing, and a
+      // missing string is the normal "draw nothing yet" state.
+      const spec = patch.texts?.[slot.key];
+      resolved = spec ? resolveTextTexture(gl, spec) : null;
+    } else {
+      const ref = patch.images?.[slot.key];
+      if (!ref) warnMissingImage(slot.key, 'no image assigned');
+      resolved = ref ? resolveTexture(gl, slot.key, ref) : null;
+    }
     const tex = resolved ? resolved.tex : ensureDummyTexture(gl);
     gl.activeTexture(gl.TEXTURE0 + unit);
     gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -394,6 +470,8 @@ function bindTextures(
 function disposeTextures(gl: WebGL2RenderingContext): void {
   for (const tex of textureCache.values()) gl.deleteTexture(tex);
   textureCache.clear();
+  for (const entry of textTextureCache.values()) gl.deleteTexture(entry.tex);
+  textTextureCache.clear();
   if (dummyTexture) {
     gl.deleteTexture(dummyTexture);
     dummyTexture = null;
@@ -641,6 +719,20 @@ function gotoPatch(
   notifySynthControlChanged();
 }
 
+/**
+ * The seed gacha's Patch: derivePatch, then the pinned text nodes grafted on
+ * (synth/pinnedText.ts). Only the seed paths use this — va.seed, a seed-only
+ * timeline event and proposeSeed. Patches that arrive whole (proposePatch, a
+ * Patch-carrying event, a bank recall) are never grafted.
+ */
+function deriveSeedPatch(seed: string): VisualPatch {
+  return applyPinnedText(
+    derivePatch(seed, { catalog: inlineCatalog }),
+    getPinnedText(),
+    metaCatalog,
+  );
+}
+
 /** React to a va.seed change. The topology decides which kind of transition runs. */
 function syncSeed(gl: WebGL2RenderingContext, seed: string, nowMs: number): void {
   if (seed === observedVaSeed) return;
@@ -649,7 +741,7 @@ function syncSeed(gl: WebGL2RenderingContext, seed: string, nowMs: number): void
   if (phase === 'fading') return;
 
   observedVaSeed = seed;
-  gotoPatch(gl, seed, derivePatch(seed, { catalog: inlineCatalog }), DEFAULT_TRANSITION, nowMs);
+  gotoPatch(gl, seed, deriveSeedPatch(seed), DEFAULT_TRANSITION, nowMs);
 }
 
 /**
@@ -669,7 +761,7 @@ function handleDue(d: DueEvent): void {
   if (seed !== undefined) {
     pendingTarget = {
       seed,
-      patch: derivePatch(seed, { catalog: inlineCatalog }),
+      patch: deriveSeedPatch(seed),
       spec: d.event.transition,
     };
   }
@@ -896,6 +988,10 @@ const control: SynthControlBackend = {
     };
   },
 
+  targetPatch() {
+    return pendingTarget?.patch ?? loading?.patch ?? incoming?.patch ?? front?.patch ?? null;
+  },
+
   proposePatch(input: unknown) {
     const result = gatePatchProposal(input, metaCatalog);
     if (!result.ok || !result.patch) {
@@ -909,7 +1005,7 @@ const control: SynthControlBackend = {
   proposeSeed(seed: string) {
     pendingTarget = {
       seed,
-      patch: derivePatch(seed, { catalog: inlineCatalog }),
+      patch: deriveSeedPatch(seed),
       spec: DEFAULT_TRANSITION,
     };
     notifySynthControlChanged();
@@ -1035,6 +1131,7 @@ export const semanticSynthScene: GlScene = {
     // without deleting them (deleting against the new context is a no-op at
     // best) and let the next frame re-upload from the image store.
     textureCache.clear();
+    textTextureCache.clear();
     dummyTexture = null;
     warnedImages.clear();
     // Persisted images have to come back before a Patch that references them can

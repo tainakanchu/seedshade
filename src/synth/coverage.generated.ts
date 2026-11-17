@@ -494,6 +494,18 @@ export const GENERATOR_COVERAGE: CoverageTable = {
     meanAlpha: { p10: 0.5018, p50: 0.7811, p90: 0.8913 },
     solidFraction: { p10: 0.5215, p50: 0.8078, p90: 0.9179 },
   },
+  type: {
+    meanAlpha: { p10: 0.1702, p50: 0.525, p90: 0.8116 },
+    solidFraction: { p10: 0.2271, p50: 0.5009, p90: 0.7764 },
+  },
+  typeMask: {
+    meanAlpha: { p10: 0.4302, p50: 0.7781, p90: 0.8593 },
+    solidFraction: { p10: 0.418, p50: 0.805, p90: 0.9084 },
+  },
+  typeWarp: {
+    meanAlpha: { p10: 0.5001, p50: 0.7781, p90: 0.8984 },
+    solidFraction: { p10: 0.5089, p50: 0.8063, p90: 0.9143 },
+  },
   typhoonShear: {
     meanAlpha: { p10: 0.5061, p50: 0.7778, p90: 0.8949 },
     solidFraction: { p10: 0.5148, p50: 0.8088, p90: 0.9168 },

@@ -72,6 +72,18 @@ export interface GeneratorDefinition {
    * 省略した Generator は今までどおり = 既存 Patch のシェーダはバイト単位で不変。
    */
   audio?: AudioTextureKind[];
+  /**
+   * テキスト入力のスロット名。`textures`（画像スロット）と同じく、スロットごとに
+   * `sampler2D` と実サイズ `vec2` の uniform を受け取る。違いは中身の出どころで、
+   * シーンは Patch の `texts["<opId>.<slot>"]`（{@link TextSpec}）を CPU で
+   * ラスタライズした SDF テクスチャ（`./texts.ts`）をバインドする。
+   *
+   * 画像スロットと名前空間を分けてあるのは、`images` と `texts` の参照先を
+   * validate が取り違えないようにするため。スロット名は `textures` と重複させないこと。
+   * 未割り当て（文字列なし）だと透明ダミー = 何も描かないので、画像スロットと
+   * 同じく seed ガチャ（derive）の候補からは外す。省略した Generator は不変。
+   */
+  textSlots?: string[];
 }
 
 export interface VisualOperator {
@@ -126,6 +138,19 @@ export interface ImageRef {
   hash: string;
 }
 
+/**
+ * テキストスロットに流し込む文字列。画像と違って中身そのものを保存する
+ * （数十バイトなので参照にする意味が無く、Replay でも同じ文字が出る）。
+ */
+export interface TextSpec {
+  /** 描く文字列。`\n` で改行。上限は schema.ts の TEXT_MAX_LENGTH。 */
+  text: string;
+  /** CSS の font-family 文字列（システムフォント想定）。例: `"Noto Sans JP", sans-serif` */
+  font: string;
+  /** CSS の font-weight（100..900）。 */
+  weight: number;
+}
+
 export interface VisualPatch {
   schemaVersion: number;
   seed: string;
@@ -139,6 +164,11 @@ export interface VisualPatch {
    * 任意フィールドなので、テクスチャを使わない Patch は今までどおり省略する。
    */
   images?: Record<string, ImageRef>;
+  /**
+   * テキストスロットへの文字列割り当て。キーは `<opId>.<slot>`（images と同じ体系）。
+   * 任意フィールドなので、文字を使わない Patch は今までどおり省略する。
+   */
+  texts?: Record<string, TextSpec>;
 }
 
 export interface RenderBudget {

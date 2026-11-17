@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AudioEngine } from './audio/AudioEngine';
 import { initDeckHost, type DeckHostHandlers } from './deck/host';
 import { openSceneDeck } from './deck/openDeck';
@@ -9,6 +9,7 @@ import { initBridgeClient } from './synth/bridgeClient';
 import { getSynthControl } from './synth/control';
 import { rerollPatch } from './synth/derive';
 import { inlineCatalog } from './synth/generators';
+import { getPinnedText, setPinnedText, subscribePinnedText } from './synth/pinnedText';
 import { serializePatch } from './synth/schema';
 import { ControlPanel } from './ui/ControlPanel';
 import { TimelinePanel } from './ui/TimelinePanel';
@@ -80,6 +81,17 @@ export function App(): React.ReactElement {
   // Panel lock-hidden (H key / ui=hide) vs. transient idle fade.
   const [panelHidden, setPanelHidden] = useState(initialUiHidden);
   const [idle, setIdle] = useState(false);
+
+  // ---- Pinned text nodes: Settings persists, synth/pinnedText owns the live copy ----
+  // A layout effect so the store is seeded before the Renderer (a passive effect
+  // below) derives its first patch. After that the store is the source of truth
+  // (control.pinText / unpinText / text-follow write it) and Settings mirrors it.
+  useLayoutEffect(() => {
+    setPinnedText(settingsRef.current.pinnedText);
+    return subscribePinnedText(() => applyUpdate({ pinnedText: getPinnedText() }));
+  }, [applyUpdate]);
+
+  const setTextLink = useCallback((textLink: boolean) => applyUpdate({ textLink }), [applyUpdate]);
 
   // ---- Engine + Renderer lifecycle (once) ----
   useEffect(() => {
@@ -412,7 +424,11 @@ export function App(): React.ReactElement {
         onTempoMultiply={onTempoMultiply}
         onTempoAuto={onTempoAuto}
       />
-      <TimelinePanel hidden={panelHidden} />
+      <TimelinePanel
+        hidden={panelHidden}
+        textLink={settings.textLink}
+        onTextLinkChange={setTextLink}
+      />
       {!glAvailable && (
         <div className="gl-required" role="alert">
           WebGL2 が必要です

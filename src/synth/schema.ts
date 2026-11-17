@@ -49,6 +49,20 @@ const imageRefSchema = v.object({
   hash: v.pipe(v.string(), v.minLength(1)),
 });
 
+/** TextSpec.text の上限（UTF-16 コード単位）。ライブで打つ文字列としては十分。 */
+export const TEXT_MAX_LENGTH = 200;
+/** TextSpec.font の上限。font-family のフォールバック列を書ける程度。 */
+export const FONT_MAX_LENGTH = 200;
+export const FONT_WEIGHT_MIN = 100;
+export const FONT_WEIGHT_MAX = 900;
+
+/** 文字列はそのまま保存する（画像と違って参照にしない）。空文字列 = 何も描かない。 */
+export const textSpecSchema = v.object({
+  text: v.pipe(v.string(), v.maxLength(TEXT_MAX_LENGTH)),
+  font: v.pipe(v.string(), v.minLength(1), v.maxLength(FONT_MAX_LENGTH)),
+  weight: v.pipe(v.number(), v.finite(), v.minValue(FONT_WEIGHT_MIN), v.maxValue(FONT_WEIGHT_MAX)),
+});
+
 export const visualPatchSchema = v.object({
   schemaVersion: v.pipe(v.number(), v.integer(), v.minValue(1)),
   seed: v.string(),
@@ -60,6 +74,8 @@ export const visualPatchSchema = v.object({
   // 任意フィールド。既存の Patch（images 無し）はそのまま通るので
   // schemaVersion は 1 のまま据え置く（後方互換な追加）。
   images: v.optional(v.record(v.string(), imageRefSchema)),
+  // texts も同じく後方互換な任意フィールド。
+  texts: v.optional(v.record(v.string(), textSpecSchema)),
 });
 
 /** Recursively sort object keys for deterministic JSON serialization. */

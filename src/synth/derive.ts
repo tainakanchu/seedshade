@@ -203,9 +203,15 @@ const PULSE_SMOOTHING_MAX = 0.15;
 
 const MAX_STRIP_ATTEMPTS = 32;
 
-/** 画像入力を要求する Generator か。derive の候補からは外す。 */
-function needsTexture(gen: InlineGenerator): boolean {
-  return (gen.def.textures?.length ?? 0) > 0;
+/**
+ * 画像 / 文字入力を要求する Generator か。derive の候補からは外す。
+ *
+ * どちらも Patch 側の割り当て（images / texts）が無ければ何も描かない（type /
+ * typeMask は空、typeWarp は変位 0）ので、ガチャが引くと「空の枠」になるだけ。
+ * 絵や文字は演者が意図して持ち込むもので、derive が勝手に出し入れしてはいけない。
+ */
+export function needsTexture(gen: InlineGenerator): boolean {
+  return (gen.def.textures?.length ?? 0) > 0 || (gen.def.textSlots?.length ?? 0) > 0;
 }
 
 /** 単体 Patch を組むための固定値。予算判定は operators と qualityTier しか見ない。 */
