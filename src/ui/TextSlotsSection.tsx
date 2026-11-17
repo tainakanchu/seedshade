@@ -1,10 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
-import type { SynthControl } from '../synth/control';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { ALL_TEXT_SLOTS, type SynthControl } from '../synth/control';
 import { typeDef, typeMaskDef, typeWarpDef } from '../synth/generators';
+import { getPinnedText, pinIndexForOp, subscribePinnedText } from '../synth/pinnedText';
 import { FONT_WEIGHT_MAX, FONT_WEIGHT_MIN, TEXT_MAX_LENGTH } from '../synth/schema';
 import { DEFAULT_TEXT_FONT, DEFAULT_TEXT_WEIGHT } from '../synth/texts';
 import type { VisualPatch } from '../synth/types';
-import { listTextSlots, patchWithTextNode, type TextSlotEntry } from './textSlots';
+import {
+  DEFAULT_NEW_TEXT,
+  linkedTextSpec,
+  listTextSlots,
+  patchWithTextNode,
+  type TextSlotEntry,
+} from './textSlots';
 
 /** Typing pause after which a draft is applied without waiting for blur / Enter. */
 const COMMIT_DEBOUNCE_MS = 450;
@@ -18,6 +25,9 @@ const ADDABLE = [
 interface SlotEditorProps {
   control: SynthControl;
   entry: TextSlotEntry;
+  /** Link on: every edit / clear goes to all text slots ("*"). */
+  link: boolean;
+  pinned: boolean;
   onIssues: (issues: string[]) => void;
 }
 
@@ -27,7 +37,8 @@ interface SlotEditorProps {
  * patch is not re-proposed on every keystroke.
  */
 function SlotEditor(props: SlotEditorProps): React.ReactElement {
-  const { control, entry, onIssues } = props;
+  const { control, entry, link, pinned, onIssues } = props;
+  const target = link ? ALL_TEXT_SLOTS : entry.key;
   const live = entry.spec;
   const [text, setText] = useState(live?.text ?? '');
   const [font, setFont] = useState(live?.font ?? DEFAULT_TEXT_FONT);
@@ -63,7 +74,7 @@ function SlotEditor(props: SlotEditorProps): React.ReactElement {
     );
     dirty.current = false;
     if (live && live.text === t && live.font === f && live.weight === w) return;
-    const res = control.setText(entry.key, { text: t, font: f, weight: w });
+    const res = control.setText(target, { text: t, font: f, weight: w });
     onIssues(res.ok ? [] : res.issues.length > 0 ? res.issues : ['text rejected']);
   };
 
@@ -80,13 +91,30 @@ function SlotEditor(props: SlotEditorProps): React.ReactElement {
         <span className="tl-anchor">{entry.generatorId}</span>
         <button
           type="button"
+          className={`btn small toggle${pinned ? ' on' : ''}`}
+          data-testid="tl-text-pin"
+          aria-pressed={pinned}
+          title={
+            pinned
+              ? 'ピンを外す（次の seed 変更から消える）'
+              : 'ピン留め: seed を変えてもこのノード（文字・パラメータ）を残す'
+          }
+          onClick={() => {
+            const res = pinned ? control.unpinText(entry.opId) : control.pinText(entry.opId);
+            onIssues(res.ok ? [] : res.issues);
+          }}
+        >
+          {pinned ? 'pinned' : 'pin'}
+        </button>
+        <button
+          type="button"
           className="btn small"
           data-testid="tl-text-clear"
-          title="この文字スロットを空にする"
+          title={link ? '全文字スロットを空にする（Link 中）' : 'この文字スロットを空にする'}
           onClick={() => {
             dirty.current = false;
             setText('');
-            const res = control.setText(entry.key, null);
+            const res = control.setText(target, null);
             onIssues(res.ok ? [] : res.issues);
           }}
         >
@@ -155,13 +183,17 @@ function SlotEditor(props: SlotEditorProps): React.ReactElement {
 interface TextSlotsSectionProps {
   control: SynthControl;
   patch: VisualPatch | null;
+  /** Settings.textLink */
+  link: boolean;
+  onLinkChange: (on: boolean) => void;
 }
 
 /** Texts section of the Timeline panel: add a type node, edit every text slot. */
 export function TextSlotsSection(props: TextSlotsSectionProps): React.ReactElement {
-  const { control, patch } = props;
+  const { control, patch, link, onLinkChange } = props;
   const [issues, setIssues] = useState<string[]>([]);
   const slots = listTextSlots(patch);
+  const pins = useSyncExternalStore(subscribePinnedText, getPinnedText);
 
   const addNode = (def: (typeof ADDABLE)[number]['def']): void => {
     const current = control.getState().currentPatch;
@@ -169,7 +201,11 @@ export function TextSlotsSection(props: TextSlotsSectionProps): React.ReactEleme
       setIssues(['synth is not running (WebGL2 required)']);
       return;
     }
-    const { patch: next } = patchWithTextNode(current, def);
+    const { patch: next } = patchWithTextNode(
+      current,
+      def,
+      (link ? linkedTextSpec(current) : null) ?? DEFAULT_NEW_TEXT,
+    );
     const res = control.proposePatch(next);
     setIssues(res.ok ? [] : res.issues.length > 0 ? res.issues : ['patch rejected']);
   };
@@ -181,6 +217,16 @@ export function TextSlotsSection(props: TextSlotsSectionProps): React.ReactEleme
         <span className="row-value">{slots.length}</span>
       </div>
       <div className="tl-form-row">
+        <button
+          type="button"
+          className={`btn small toggle${link ? ' on' : ''}`}
+          data-testid="tl-text-link"
+          aria-pressed={link}
+          title="Link オン: どのスロットを編集しても全文字スロットに同じ文字・フォント・ウェイトを書く"
+          onClick={() => onLinkChange(!link)}
+        >
+          Link
+        </button>
         {ADDABLE.map((a) => (
           <button
             key={a.def.id}
@@ -202,8 +248,37 @@ export function TextSlotsSection(props: TextSlotsSectionProps): React.ReactEleme
       ) : (
         <div className="tl-rows">
           {slots.map((entry) => (
-            <SlotEditor key={entry.key} control={control} entry={entry} onIssues={setIssues} />
+            <SlotEditor
+              key={entry.key}
+              control={control}
+              entry={entry}
+              link={link}
+              pinned={pinIndexForOp(pins, entry.opId) >= 0}
+              onIssues={setIssues}
+            />
           ))}
+        </div>
+      )}
+      {pins && (
+        <div className="tl-pins" data-testid="tl-text-pins">
+          <div className="tl-form-row">
+            <span className="tl-note">
+              pinned（seed を変えても残る）:{' '}
+              {pins.nodes.map((n) => `${n.opId} "${n.text.text}"`).join(', ')}
+            </span>
+            <button
+              type="button"
+              className="btn small"
+              data-testid="tl-text-unpin-all"
+              title="ピンをすべて外す（今の映像はそのまま、次の seed 変更から消える）"
+              onClick={() => {
+                const res = control.unpinText();
+                setIssues(res.ok ? [] : res.issues);
+              }}
+            >
+              Unpin all
+            </button>
+          </div>
         </div>
       )}
       {issues.length > 0 && (

@@ -37,6 +37,17 @@ export function listTextSlots(patch: VisualPatch | null): TextSlotEntry[] {
 /** Text the panel puts into a freshly added node so it is visible at once. */
 export const DEFAULT_NEW_TEXT = 'SEEDSHADE';
 
+/**
+ * What a new node starts from while "Link" is on: the first assigned text slot
+ * in operator order, or null when the patch has none (→ {@link DEFAULT_NEW_TEXT}).
+ */
+export function linkedTextSpec(patch: VisualPatch | null): TextSpec | null {
+  for (const entry of listTextSlots(patch)) {
+    if (entry.spec) return { ...entry.spec };
+  }
+  return null;
+}
+
 function freshOpId(patch: VisualPatch, base: string): string {
   const taken = new Set(patch.operators.map((op) => op.id));
   for (let i = 0; ; i++) {
@@ -53,7 +64,7 @@ function defaultOperator(def: GeneratorDefinition, id: string): VisualOperator {
 
 /**
  * Add a text node (type / typeMask / typeWarp) to the patch with a default
- * string in its slot.
+ * string (or a whole TextSpec — the linked text) in its slot.
  *
  * A source goes first, everything else last (stages are ordered by role, so
  * only the order inside a role matters). When the category is already at its
@@ -64,7 +75,7 @@ function defaultOperator(def: GeneratorDefinition, id: string): VisualOperator {
 export function patchWithTextNode(
   patch: VisualPatch,
   def: GeneratorDefinition,
-  text: string = DEFAULT_NEW_TEXT,
+  text: string | TextSpec = DEFAULT_NEW_TEXT,
 ): { patch: VisualPatch; key: string } {
   const opId = freshOpId(patch, def.id);
   const op = defaultOperator(def, opId);
@@ -113,7 +124,10 @@ export function patchWithTextNode(
   const images = dropKeys(patch.images);
   const texts = {
     ...dropKeys(patch.texts),
-    [key]: { text, font: DEFAULT_TEXT_FONT, weight: DEFAULT_TEXT_WEIGHT },
+    [key]:
+      typeof text === 'string'
+        ? { text, font: DEFAULT_TEXT_FONT, weight: DEFAULT_TEXT_WEIGHT }
+        : { ...text },
   };
   const { images: _i, texts: _t, ...rest } = patch;
   void _i;

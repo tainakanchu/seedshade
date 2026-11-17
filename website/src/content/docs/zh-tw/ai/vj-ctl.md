@@ -15,7 +15,11 @@ description: 一次送一個指令的基本 CLI。取得狀態、套用種子 / 
 | `seed <seed>` | **立刻**過渡到該種子的外觀 |
 | `patch <file.json>` | **立刻**套用 Patch 的 JSON（驗證失敗會回傳 issues） |
 | `image <file> [--name <n>]` | 登錄圖片（png / jpg / webp / gif / svg / avif，最大 5MB）。把回傳的 `hash` 放進 Patch 的 `images` 使用 |
-| `text <opId[.slot]> [<字串>] [--font <css>] [--weight <n>]` | 更換文字節點（`type` 系列）的文字。`\n` 為換行，省略字串即解除（[文字節點](../../guide/type-nodes/)） |
+| `text <opId[.slot]> [<字串>] [--font <css>] [--weight <n>]` | 更換文字節點（`type` 系列）的文字。`\n` 為換行，省略字串即解除。opId 指定 `'*'` 會寫入所有文字欄位（[文字節點](../../guide/type-nodes/)） |
+| `pin <opId>` | 釘選目前 Patch 的文字節點（已釘選則以目前的值更新）。更換 seed 後也會插入新的 Patch |
+| `pin --generator <type\|typeMask\|typeWarp> <字串> [--font <css>] [--weight <n>] [--id <opId>]` | 以字串建立新的釘選 |
+| `unpin [<opId>]` | 取消釘選（省略即全部解除） |
+| `pins` | 列出釘選中的文字節點 |
 | `event add …` | 在 Timeline 預約事件（見下方） |
 | `event remove <id>` | 取消預約 |
 | `lock <sec>` | 從現在起 N 秒內鎖定 Timeline（相對指定） |

@@ -18,6 +18,9 @@ import { TextSlotsSection } from './TextSlotsSection';
 
 interface TimelinePanelProps {
   hidden: boolean;
+  /** Texts section "Link" (Settings.textLink). */
+  textLink: boolean;
+  onTextLinkChange: (on: boolean) => void;
 }
 
 /** Anchor unit selectable in the add-event form. */
@@ -153,7 +156,7 @@ function patchWithStamp(patch: VisualPatch, ref: ImageRef): VisualPatch {
 }
 
 export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
-  const { hidden } = props;
+  const { hidden, textLink, onTextLinkChange } = props;
 
   // Singleton bridge to the synth scene; memoized so the subscription below is
   // established exactly once.
@@ -692,7 +695,12 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
         </div>
 
         {/* ---- Texts ---- */}
-        <TextSlotsSection control={control} patch={state.currentPatch} />
+        <TextSlotsSection
+          control={control}
+          patch={state.currentPatch}
+          link={textLink}
+          onLinkChange={onTextLinkChange}
+        />
 
         {/* ---- Recording ---- */}
         <div className="tl-section">

@@ -20,6 +20,9 @@ const control = vi.hoisted(() => ({
   proposePatch: vi.fn(),
   proposeSeed: vi.fn(),
   setText: vi.fn(),
+  pinText: vi.fn(),
+  unpinText: vi.fn(),
+  getPinnedText: vi.fn(),
   applyTimelineOp: vi.fn(),
   fireExternal: vi.fn(),
   startRecording: vi.fn(),
@@ -383,11 +386,62 @@ describe('handleBridgeMessage', () => {
     expect(control.setText).toHaveBeenLastCalledWith('t.text', null);
   });
 
-  it('rejects setText with a missing key or a non-string text', () => {
-    expect(handleBridgeMessage('{"id":23,"method":"setText","params":{"text":"A"}}')).toEqual({
+  it('setText without a key (or "*") writes every text slot', () => {
+    control.setText.mockReturnValue({ ok: true, issues: [] });
+    void handleBridgeMessage('{"id":30,"method":"setText","params":{"text":"ALL"}}');
+    expect(control.setText).toHaveBeenLastCalledWith('*', { text: 'ALL' });
+    void handleBridgeMessage('{"id":31,"method":"setText","params":{"key":"*","text":"B"}}');
+    expect(control.setText).toHaveBeenLastCalledWith('*', { text: 'B' });
+    void handleBridgeMessage('{"id":32,"method":"setText","params":{"clear":true}}');
+    expect(control.setText).toHaveBeenLastCalledWith('*', null);
+  });
+
+  it('routes pinText (opId / node), unpinText and getPinnedText', () => {
+    const pinned = { nodes: [] };
+    control.pinText.mockReturnValue({ ok: true, issues: [], pinned, opId: 'type0' });
+    control.unpinText.mockReturnValue({ ok: true, issues: [], pinned: null });
+    control.getPinnedText.mockReturnValue(null);
+
+    expect(handleBridgeMessage('{"id":40,"method":"pinText","params":{"opId":"type0"}}')).toEqual({
+      id: 40,
+      result: { ok: true, issues: [], pinned, opId: 'type0' },
+    });
+    expect(control.pinText).toHaveBeenLastCalledWith('type0');
+
+    const node = { generatorId: 'typeMask', text: 'HI' };
+    void handleBridgeMessage(JSON.stringify({ id: 41, method: 'pinText', params: { node } }));
+    expect(control.pinText).toHaveBeenLastCalledWith(node);
+
+    expect(handleBridgeMessage('{"id":42,"method":"pinText","params":{}}')).toEqual({
+      id: 42,
+      error: expect.stringContaining('params.opId') as unknown,
+    });
+
+    void handleBridgeMessage('{"id":43,"method":"unpinText"}');
+    expect(control.unpinText).toHaveBeenLastCalledWith(undefined);
+    void handleBridgeMessage('{"id":44,"method":"unpinText","params":{"opId":"type0"}}');
+    expect(control.unpinText).toHaveBeenLastCalledWith('type0');
+    expect(handleBridgeMessage('{"id":45,"method":"unpinText","params":{"opId":3}}')).toEqual({
+      id: 45,
+      error: expect.stringContaining('params.opId') as unknown,
+    });
+
+    expect(handleBridgeMessage('{"id":46,"method":"getPinnedText"}')).toEqual({
+      id: 46,
+      result: { pinned: null },
+    });
+  });
+
+  it('rejects setText with an empty / non-string key or a non-string text', () => {
+    expect(
+      handleBridgeMessage('{"id":23,"method":"setText","params":{"key":"","text":"A"}}'),
+    ).toEqual({
       id: 23,
       error: expect.stringContaining('params.key') as unknown,
     });
+    expect(
+      handleBridgeMessage('{"id":25,"method":"setText","params":{"key":5,"text":"A"}}'),
+    ).toEqual({ id: 25, error: expect.stringContaining('params.key') as unknown });
     expect(
       handleBridgeMessage('{"id":24,"method":"setText","params":{"key":"t","text":5}}'),
     ).toEqual({ id: 24, error: expect.stringContaining('params.text') as unknown });

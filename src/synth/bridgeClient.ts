@@ -1,4 +1,4 @@
-import { getSynthControl } from './control';
+import { getSynthControl, type PinTextNodeInput } from './control';
 import { inlineCatalog } from './generators';
 import type { TimelineOp } from './timeline';
 
@@ -187,12 +187,15 @@ function dispatch(
     }
 
     case 'setText': {
-      // params: { key: "<opId>[.<slot>]", text?: string, font?: string, weight?: number,
+      // params: { key?: "<opId>[.<slot>]" | "*", text?: string, font?: string, weight?: number,
       //           clear?: boolean }。clear: true（または text 省略）で割り当て解除。
-      const key = params?.key;
-      if (typeof key !== 'string' || key.trim() === '') {
-        return fail('setText requires params.key as "<opId>" or "<opId>.<slot>"');
+      // key 省略 / "*" は Patch 内の全テキストスロットへ同じ値（文字のリンク）。
+      const rawKey = params?.key;
+      if (rawKey !== undefined && (typeof rawKey !== 'string' || rawKey.trim() === '')) {
+        return fail('setText params.key must be "<opId>", "<opId>.<slot>" or "*" (omit for all)');
       }
+      // control.ALL_TEXT_SLOTS と同じ値。control はテストでモジュールごと差し替わるので直書き。
+      const key = rawKey ?? '*';
       const text = params?.text;
       const font = params?.font;
       const weight = params?.weight;
@@ -214,6 +217,30 @@ function dispatch(
         }),
       );
     }
+
+    case 'pinText': {
+      // params: { opId: string }（今の Patch のノードをピン）
+      //      or { node: { generatorId, text, parameters?, opId? } }（定義を直接ピン）。
+      const opId = params?.opId;
+      const node = params?.node;
+      if (typeof opId === 'string' && opId.trim() !== '') return ok(control.pinText(opId));
+      if (node && typeof node === 'object') {
+        return ok(control.pinText(node as unknown as PinTextNodeInput));
+      }
+      return fail('pinText requires params.opId as string or params.node as object');
+    }
+
+    case 'unpinText': {
+      // params: { opId?: string }。省略（または "*"）で全解除。
+      const opId = params?.opId;
+      if (opId !== undefined && typeof opId !== 'string') {
+        return fail('unpinText params.opId must be a string');
+      }
+      return ok(control.unpinText(opId));
+    }
+
+    case 'getPinnedText':
+      return ok({ pinned: control.getPinnedText() });
 
     case 'applyTimelineOp': {
       const op = params?.op;

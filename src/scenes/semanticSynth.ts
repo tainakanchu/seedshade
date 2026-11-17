@@ -19,6 +19,7 @@ import {
 } from '../synth/control';
 import { DEFAULT_BUDGETS } from '../synth/cost';
 import { derivePatch } from '../synth/derive';
+import { applyPinnedText, getPinnedText } from '../synth/pinnedText';
 import { assemblePatch, SEED_UNIFORM, type AssembledShader } from '../synth/gl/assemble';
 import { createAudioTextureSet, type AudioTextureSet } from '../synth/gl/audioTextureGl';
 import { allGeneratorDefinitions, inlineCatalog } from '../synth/generators';
@@ -719,6 +720,20 @@ function gotoPatch(
   notifySynthControlChanged();
 }
 
+/**
+ * The seed gacha's Patch: derivePatch, then the pinned text nodes grafted on
+ * (synth/pinnedText.ts). Only the seed paths use this — va.seed, a seed-only
+ * timeline event and proposeSeed. Patches that arrive whole (proposePatch, a
+ * Patch-carrying event, a bank recall) are never grafted.
+ */
+function deriveSeedPatch(seed: string): VisualPatch {
+  return applyPinnedText(
+    derivePatch(seed, { catalog: inlineCatalog }),
+    getPinnedText(),
+    metaCatalog,
+  );
+}
+
 /** React to a va.seed change. The topology decides which kind of transition runs. */
 function syncSeed(gl: WebGL2RenderingContext, seed: string, nowMs: number): void {
   if (seed === observedVaSeed) return;
@@ -727,7 +742,7 @@ function syncSeed(gl: WebGL2RenderingContext, seed: string, nowMs: number): void
   if (phase === 'fading') return;
 
   observedVaSeed = seed;
-  gotoPatch(gl, seed, derivePatch(seed, { catalog: inlineCatalog }), DEFAULT_TRANSITION, nowMs);
+  gotoPatch(gl, seed, deriveSeedPatch(seed), DEFAULT_TRANSITION, nowMs);
 }
 
 /**
@@ -745,7 +760,7 @@ function handleDue(d: DueEvent): void {
   if (seed !== undefined) {
     pendingTarget = {
       seed,
-      patch: derivePatch(seed, { catalog: inlineCatalog }),
+      patch: deriveSeedPatch(seed),
       spec: d.event.transition,
     };
   }
@@ -994,7 +1009,7 @@ const control: SynthControlBackend = {
   proposeSeed(seed: string) {
     pendingTarget = {
       seed,
-      patch: derivePatch(seed, { catalog: inlineCatalog }),
+      patch: deriveSeedPatch(seed),
       spec: DEFAULT_TRANSITION,
     };
     notifySynthControlChanged();

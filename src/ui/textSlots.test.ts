@@ -3,7 +3,7 @@ import { createCatalog } from '../synth/catalog';
 import { allGeneratorDefinitions, typeDef, typeMaskDef, typeWarpDef } from '../synth/generators';
 import type { VisualPatch } from '../synth/types';
 import { validatePatch } from '../synth/validate';
-import { DEFAULT_NEW_TEXT, listTextSlots, patchWithTextNode } from './textSlots';
+import { DEFAULT_NEW_TEXT, linkedTextSpec, listTextSlots, patchWithTextNode } from './textSlots';
 
 const catalog = createCatalog(allGeneratorDefinitions());
 
@@ -61,5 +61,15 @@ describe('ui/textSlots', () => {
     expect(listTextSlots(p)).toEqual([
       { key: 'w.text', opId: 'w', slot: 'text', generatorId: 'typeWarp', spec: null },
     ]);
+  });
+
+  it('linkedTextSpec copies the first assigned slot, and a new node can start from it', () => {
+    expect(linkedTextSpec(basePatch())).toBeNull();
+    const spec = { text: 'LINKED', font: 'serif', weight: 300 };
+    const first = patchWithTextNode(basePatch(), typeWarpDef, spec).patch;
+    expect(linkedTextSpec(first)).toEqual(spec);
+    const second = patchWithTextNode(first, typeMaskDef, linkedTextSpec(first) ?? DEFAULT_NEW_TEXT);
+    expect(second.patch.texts?.[second.key]).toEqual(spec);
+    expect(validatePatch(second.patch, catalog)).toEqual([]);
   });
 });
