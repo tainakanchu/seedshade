@@ -362,9 +362,9 @@ function clamp(v, lo, hi) {
   return Math.min(hi, Math.max(lo, v));
 }
 
-/** 画像入力を要求する Generator か。derive.ts の needsTexture と同じ判断。候補から外す。 */
+/** 画像 / 文字入力を要求する Generator か。derive.ts の needsTexture と同じ判断。候補から外す。 */
 function needsTexture(gen) {
-  return (gen.textures?.length ?? 0) > 0;
+  return (gen.textures?.length ?? 0) > 0 || (gen.textSlots?.length ?? 0) > 0;
 }
 
 /** カタログ配列（フラットな GeneratorDefinition[]）を category ごと、テクスチャ Generator 抜きで分ける。 */

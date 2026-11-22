@@ -97,6 +97,10 @@ Patch 的限制（Generator 的數量・順序・參數範圍等）詳見 [Seman
 - 每個 Patch 的 Source 最多 2 個，所以若已經有 2 個，最後一個 Source 會被移除並換成 `stamp`。
 - `stamp` 不會在種子抽選中被選到。重抽種子後圖片會消失，請再按一次 **stamp に使う**。
 
+## Texts（加入文字）
+
+在 Images 下方的 **Texts** 區段，按下 `+ type` / `+ mask` / `+ warp` 即可把文字節點加入 Patch。文字、font、weight 的編輯也在這裡。詳情請見[文字節點](../type-nodes/)。
+
 ## Recording（記錄與重播演出）
 
 1. 按 **● Record** 開始記錄。之後的 Timeline 操作（新增、刪除事件等）與觸發都會被記錄。

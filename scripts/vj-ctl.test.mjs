@@ -2,7 +2,7 @@
 // 偽の WebSocket サーバは立てない — buildEventAdd は conn.request(method, params) だけを
 // 呼ぶ純粋寄りの async 関数なので、trivial なスタブ conn を渡して直接 import テストする。
 import { describe, expect, it } from 'vitest';
-import { buildEventAdd } from './vj-ctl.mjs';
+import { buildEventAdd, run } from './vj-ctl.mjs';
 
 /** conn.request('getState') が返す最小限の state。nowSec / barCount だけ使われる。 */
 function stubConn(state = { nowSec: 10, barCount: 2 }) {
@@ -89,5 +89,53 @@ describe('buildEventAdd', () => {
         ]),
       ),
     ).rejects.toThrow(/--transition/);
+  });
+});
+
+/** request を記録して ok を返すだけの接続。 */
+function recordingConn() {
+  const calls = [];
+  return {
+    calls,
+    request: async (method, params) => {
+      calls.push({ method, params });
+      return { ok: true, issues: [] };
+    },
+  };
+}
+
+describe('run: text link / pin commands', () => {
+  it("text '*' sends setText with the all-slots key", async () => {
+    const conn = recordingConn();
+    await run(conn, ['text', '*', 'SEED', 'SHADE'], new Map([['weight', '900']]));
+    expect(conn.calls).toEqual([
+      { method: 'setText', params: { key: '*', text: 'SEED SHADE', weight: 900 } },
+    ]);
+  });
+
+  it('pin <opId> / pin --generator / unpin [opId] / pins', async () => {
+    const conn = recordingConn();
+    await run(conn, ['pin', 'type0'], new Map());
+    await run(
+      conn,
+      ['pin', 'HELLO\\nWORLD'],
+      new Map([
+        ['generator', 'typeMask'],
+        ['id', 'm0'],
+      ]),
+    );
+    await run(conn, ['unpin', 'type0'], new Map());
+    await run(conn, ['unpin'], new Map());
+    await run(conn, ['pins'], new Map());
+    expect(conn.calls).toEqual([
+      { method: 'pinText', params: { opId: 'type0' } },
+      {
+        method: 'pinText',
+        params: { node: { generatorId: 'typeMask', text: { text: 'HELLO\nWORLD' }, opId: 'm0' } },
+      },
+      { method: 'unpinText', params: { opId: 'type0' } },
+      { method: 'unpinText', params: {} },
+      { method: 'getPinnedText', params: undefined },
+    ]);
   });
 });

@@ -83,7 +83,13 @@ export function textureSizeUniformName(opId: string, slot: string): string {
 export interface TextureBinding {
   opId: string;
   slot: string;
-  /** Patch.images のキー（`<opId>.<slot>`）。 */
+  /**
+   * スロットの中身の出どころ。`'image'` = `def.textures`（Patch.images を引く）、
+   * `'text'` = `def.textSlots`（Patch.texts をラスタライズした SDF を引く）。
+   * GL 側の扱い（sampler2D + size uniform、未割り当ては透明ダミー）は同じ。
+   */
+  source: 'image' | 'text';
+  /** Patch.images / Patch.texts のキー（`<opId>.<slot>`）。 */
   key: string;
   /** sampler2D uniform 名。 */
   name: string;
@@ -224,9 +230,16 @@ export function assemblePatch(
     const idx = roleCounts[role]++;
     const fnName = `${role}_${idx}`;
     const nsName = nsUniformName(op.id);
-    const opTextures: TextureBinding[] = (gen.def.textures ?? []).map((slot) => ({
+    // Image slots first, then text slots — both in declaration order. A
+    // generator without textSlots produces exactly the bindings it always did.
+    const slotSources: Array<[string, TextureBinding['source']]> = [
+      ...(gen.def.textures ?? []).map((slot): [string, 'image'] => [slot, 'image']),
+      ...(gen.def.textSlots ?? []).map((slot): [string, 'text'] => [slot, 'text']),
+    ];
+    const opTextures: TextureBinding[] = slotSources.map(([slot, source]) => ({
       opId: op.id,
       slot,
+      source,
       key: `${op.id}.${slot}`,
       name: textureUniformName(op.id, slot),
       sizeName: textureSizeUniformName(op.id, slot),
@@ -348,7 +361,8 @@ export function assemblePatch(
       if (!declaredSlots.has(slot)) {
         throw new Error(
           `assemblePatch: generator "${r.def.id}" requested texture slot "${slot}" ` +
-            `which it does not declare (textures: [${(r.def.textures ?? []).join(', ')}])`,
+            `which it does not declare (textures: [${(r.def.textures ?? []).join(', ')}], ` +
+            `textSlots: [${(r.def.textSlots ?? []).join(', ')}])`,
         );
       }
     };

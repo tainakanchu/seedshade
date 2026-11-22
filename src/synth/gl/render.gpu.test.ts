@@ -272,6 +272,74 @@ describe('synth/gl assemblePatch GPU render', () => {
   );
 
   it(
+    'text nodes draw nothing / change nothing with an empty slot',
+    async () => {
+      const type = requireGen('type');
+      const typeMask = requireGen('typeMask');
+      const typeWarp = requireGen('typeWarp');
+      const grid = requireGen('grid');
+      const mirror = requireGen('mirror');
+      const neon = requireGen('neon');
+
+      // 1. type with the transparent dummy (= no text assigned) → empty frame.
+      const typeOnly: NamedPatch = {
+        label: 'source:type+material:neon',
+        patch: basePatch([opFromDef('src0', type.def), opFromDef('mat0', neon.def)], SEED),
+      };
+      const empty = await renderPatch(pg, typeOnly, SIZE, 'transparent');
+      if (!empty.ok) throw new Error(`type without text failed: ${empty.log}`);
+      expect(empty.frame.alphaCount > 0, 'an unassigned type must render empty').toBe(false);
+
+      // 2. typeMask / typeWarp with the dummy are the identity on the base frame.
+      const base: NamedPatch = {
+        label: 'source:grid+mirror+neon',
+        patch: basePatch(
+          [opFromDef('src0', grid.def), opFromDef('mod0', mirror.def), opFromDef('mat0', neon.def)],
+          SEED,
+        ),
+      };
+      const ref = await renderPatch(pg, base, SIZE, 'transparent');
+      if (!ref.ok) throw new Error(`base failed: ${ref.log}`);
+      for (const [label, ops] of [
+        [
+          'typeMask',
+          [
+            opFromDef('src0', grid.def),
+            opFromDef('mod0', mirror.def),
+            opFromDef('mask0', typeMask.def),
+            opFromDef('mat0', neon.def),
+          ],
+        ],
+        [
+          'typeWarp',
+          [
+            opFromDef('src0', grid.def),
+            opFromDef('fld0', typeWarp.def),
+            opFromDef('mod0', mirror.def),
+            opFromDef('mat0', neon.def),
+          ],
+        ],
+      ] as const) {
+        const r = await renderPatch(
+          pg,
+          { label, patch: basePatch([...ops], SEED) },
+          SIZE,
+          'transparent',
+        );
+        if (!r.ok) throw new Error(`${label} without text failed: ${r.log}`);
+        expect(r.frame.alphaCount, `${label} changed the frame with no text`).toBe(
+          ref.frame.alphaCount,
+        );
+        expect(r.frame.meanAlpha, `${label} changed the frame with no text`).toBeCloseTo(
+          ref.frame.meanAlpha,
+          5,
+        );
+      }
+    },
+    renderTimeoutMs,
+  );
+
+  it(
     `raymarched sources render continuous tone (${RAYMARCHED_SOURCE_IDS.length} patches)`,
     async () => {
       const neon = requireGen('neon');

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createCatalog } from './catalog';
 import { DEFAULT_BUDGETS, estimateCost, fitsBudget } from './cost';
-import { derivePatch, rerollPatch, SAFE_TARGET_PARAMS } from './derive';
+import { derivePatch, needsTexture, rerollPatch, SAFE_TARGET_PARAMS } from './derive';
 import { createInlineCatalog, inlineCatalog } from './generators';
 import type { InlineGenerator } from './generators/types';
 import { CURRENT_SCHEMA_VERSION, serializePatch } from './schema';
@@ -13,28 +13,23 @@ const QUALITY_TIERS: readonly QualityTier[] = ['low', 'medium', 'high'];
 /** Generators the tier filter is there for: heavy is banned outright at low. */
 const HEAVY_SOURCE_IDS = inlineCatalog
   .all()
-  .filter(
-    (g) =>
-      g.def.category === 'source' &&
-      g.def.costClass === 'heavy' &&
-      (g.def.textures?.length ?? 0) === 0,
-  )
+  .filter((g) => g.def.category === 'source' && g.def.costClass === 'heavy' && !needsTexture(g))
   .map((g) => g.def.id);
 
 /**
- * Sources the seed gacha may pick. Generators with a texture input are excluded
- * on purpose: a picture is something the operator brings deliberately, so derive
- * must never make one appear (or vanish) on its own.
+ * Sources the seed gacha may pick. Generators with a texture or text input are
+ * excluded on purpose: a picture / a string is something the operator brings
+ * deliberately, so derive must never make one appear (or vanish) on its own.
  */
 const SOURCE_IDS = inlineCatalog
   .all()
-  .filter((g) => g.def.category === 'source' && (g.def.textures?.length ?? 0) === 0)
+  .filter((g) => g.def.category === 'source' && !needsTexture(g))
   .map((g) => g.def.id);
 
-/** Every generator that declares a texture slot — none of these may be derived. */
+/** Every generator that declares an image or text slot — none of these may be derived. */
 const TEXTURED_IDS = inlineCatalog
   .all()
-  .filter((g) => (g.def.textures?.length ?? 0) > 0)
+  .filter((g) => needsTexture(g))
   .map((g) => g.def.id);
 
 /**
@@ -264,6 +259,8 @@ describe('synth/derive', () => {
   describe('texture generators are never derived', () => {
     it('catalog actually has at least one (otherwise this test proves nothing)', () => {
       expect(TEXTURED_IDS).toContain('stamp');
+      // Text-slot generators are excluded the same way.
+      expect(TEXTURED_IDS).toEqual(expect.arrayContaining(['type', 'typeMask', 'typeWarp']));
     });
 
     it('2000 seeds never select a generator with a texture slot', () => {
@@ -277,6 +274,7 @@ describe('synth/derive', () => {
         }
         // A derived patch never carries image references either.
         expect(patch.images, `seed ${seed} produced images`).toBeUndefined();
+        expect(patch.texts, `seed ${seed} produced texts`).toBeUndefined();
       }
       expect(offenders, `derived patches contained texture generators: ${offenders[0]}`).toEqual(
         [],

@@ -307,6 +307,7 @@ describe('synth/gl/assemblePatch texture slots', () => {
       {
         opId: 'src0',
         slot: 'image',
+        source: 'image',
         key: 'src0.image',
         name: 'u_src0_tex_image',
         sizeName: 'u_src0_tex_image_size',
@@ -621,5 +622,68 @@ describe('synth/gl/assemblePatch audio textures', () => {
       expect(declared.has('spectrum'), `${gen.def.id} spectrum`).toBe(usesSpectrum);
       expect(declared.has('wave'), `${gen.def.id} wave`).toBe(usesWave);
     }
+  });
+});
+
+/** Patch with all three text nodes: type (source), typeWarp (field), typeMask (value mod). */
+function typePatch(texts?: VisualPatch['texts']): VisualPatch {
+  const patch = defaultPatch();
+  return {
+    ...patch,
+    operators: [
+      { id: 'txt', generatorId: 'type', generatorVersion: 1, parameters: {} },
+      { id: 'warp', generatorId: 'typeWarp', generatorVersion: 1, parameters: {} },
+      { id: 'mask', generatorId: 'typeMask', generatorVersion: 1, parameters: {} },
+      patch.operators[3]!,
+    ],
+    ...(texts ? { texts } : {}),
+  };
+}
+
+describe('synth/gl/assemblePatch text slots', () => {
+  const spec = { text: 'HELLO', font: 'sans-serif', weight: 700 };
+
+  it('declares a sampler + size per text slot, marked as source "text"', () => {
+    const { fragSrc, textures } = assemblePatch(typePatch(), inlineCatalog);
+    expect(textures).toEqual(
+      ['txt', 'warp', 'mask'].map((opId) => ({
+        opId,
+        slot: 'text',
+        source: 'text',
+        key: `${opId}.text`,
+        name: textureUniformName(opId, 'text'),
+        sizeName: textureSizeUniformName(opId, 'text'),
+      })),
+    );
+    expect(fragSrc).toContain('precision highp sampler2D;');
+    expect(fragSrc).toContain('uniform sampler2D u_txt_tex_text;');
+    // Shared placement helper is emitted exactly once for three users.
+    expect(fragSrc.split('vec2 typePlace(').length - 1).toBe(1);
+    expect(fragSrc.split('float typeCoverage(').length - 1).toBe(1);
+  });
+
+  it('the string never reaches the shader: texts change → identical fragSrc', () => {
+    const none = assemblePatch(typePatch(), inlineCatalog).fragSrc;
+    const a = assemblePatch(typePatch({ 'txt.text': spec }), inlineCatalog).fragSrc;
+    const b = assemblePatch(
+      typePatch({ 'txt.text': { text: '別の文字', font: 'serif', weight: 300 } }),
+      inlineCatalog,
+    ).fragSrc;
+    expect(a).toBe(none);
+    expect(b).toBe(none);
+  });
+
+  it('a patch without text nodes is byte-identical with or without a texts field', () => {
+    const plain = assemblePatch(defaultPatch(), inlineCatalog);
+    const withField = assemblePatch({ ...defaultPatch(), texts: {} }, inlineCatalog);
+    expect(withField.fragSrc).toBe(plain.fragSrc);
+    expect(plain.fragSrc).not.toContain('typePlace');
+    expect(plain.fragSrc).not.toContain('sampler2D');
+  });
+
+  it('a stamp-only patch keeps image-only bindings (no text prelude)', () => {
+    const { fragSrc, textures } = assemblePatch(stampPatch(), inlineCatalog);
+    expect(textures.map((t) => t.source)).toEqual(['image']);
+    expect(fragSrc).not.toContain('typePlace');
   });
 });

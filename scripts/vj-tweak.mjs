@@ -487,6 +487,12 @@ export function applyDelete(raw, change, draft, currentIds, errors) {
       if (key.startsWith(`${opId}.`)) delete draft.images[key];
     }
   }
+  // texts も同じ名前空間なので同様に掃除する。
+  if (draft.texts) {
+    for (const key of Object.keys(draft.texts)) {
+      if (key.startsWith(`${opId}.`)) delete draft.texts[key];
+    }
+  }
   currentIds.delete(opId);
 }
 

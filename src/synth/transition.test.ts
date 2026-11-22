@@ -448,6 +448,40 @@ describe('synth/transition', () => {
     });
   });
 
+  describe('text assignments', () => {
+    const font = 'sans-serif';
+    const oldText = { 'src.text': { text: 'OLD', font, weight: 700 } };
+    const newText = { 'src.text': { text: 'NEW', font, weight: 400 } };
+
+    it('a text edit is not a topology change (no recompile, no deck crossfade)', () => {
+      const from = basePatch({ texts: oldText });
+      const to = basePatch({ texts: newText });
+      expect(sameTopology(from, to)).toBe(true);
+      expect(createTransition(from, to, linearSpec(), 0).needsDecks).toBe(false);
+      // Adding the first text to a patch is not one either.
+      expect(createTransition(basePatch(), to, linearSpec(), 0).needsDecks).toBe(false);
+    });
+
+    it('takes the target text immediately through the morph', () => {
+      const tr = createTransition(
+        basePatch({ texts: oldText }),
+        basePatch({ texts: newText }),
+        linearSpec(),
+        0,
+      );
+      for (const t of [0, 400, 1000]) {
+        expect(tr.sample(t).patch.texts).toEqual(newText);
+      }
+    });
+
+    it('leaves the key absent when the target has no texts', () => {
+      const tr = createTransition(basePatch({ texts: oldText }), basePatch(), linearSpec(), 0);
+      expect('texts' in tr.sample(0).patch).toBe(false);
+      const plain = createTransition(basePatch(), basePatch({ seed: 'B' }), linearSpec(), 0);
+      expect('texts' in plain.sample(500).patch).toBe(false);
+    });
+  });
+
   describe('image references', () => {
     const oldRef = { 'src.image': { name: 'old.png', hash: 'aaa' } };
     const newRef = { 'src.image': { name: 'new.png', hash: 'bbb' } };

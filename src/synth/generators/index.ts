@@ -104,6 +104,9 @@ import { sodiumGenerator } from './sodium';
 import { spinGenerator } from './spin';
 import { spiralGenerator } from './spiral';
 import { stampGenerator } from './stamp';
+import { typeGenerator } from './type';
+import { typeMaskGenerator } from './typeMask';
+import { typeWarpGenerator } from './typeWarp';
 import { stripesGenerator } from './stripes';
 import { sunbleachedTarpGenerator } from './sunbleachedTarp';
 import { sunburstGenerator } from './sunburst';
@@ -251,6 +254,9 @@ export { blueprintGenerator, blueprintDef } from './blueprint';
 export { goldfoilGenerator, goldfoilDef } from './goldfoil';
 export { hatchingGenerator, hatchingDef } from './hatching';
 export { stampGenerator, stampDef } from './stamp';
+export { typeGenerator, typeDef, TYPE_TEXT_SLOT } from './type';
+export { typeMaskGenerator, typeMaskDef } from './typeMask';
+export { typeWarpGenerator, typeWarpDef } from './typeWarp';
 export { auroraCurtainGenerator, auroraCurtainDef } from './auroraCurtain';
 export { beatRingsGenerator, beatRingsDef } from './beatRings';
 export { inkMarbleGenerator, inkMarbleDef } from './inkMarble';
@@ -318,6 +324,8 @@ const ALL: InlineGenerator[] = [
   sdfPlanetGenerator,
   // 画像入力を持つ source（seed ガチャの対象外 — derive.ts が textures 持ちを除外する）
   stampGenerator,
+  // 文字入力（textSlots）を持つ source。stamp と同じくガチャの対象外。
+  typeGenerator,
   // legacy-scene ports (bars / radial / waveform / lissajous / rings / particles /
   // fluid / smoke / aurora). The spectrum / scope ones read the per-frame audio
   // textures (def.audio) — unlike image slots they stay in the seed gacha.
@@ -348,6 +356,8 @@ const ALL: InlineGenerator[] = [
   scooterSlipstreamGenerator,
   crossingParallaxGenerator,
   shockwaveGenerator,
+  // text-slot field (seed ガチャの対象外)
+  typeWarpGenerator,
   // modifiers (coord + value)
   mirrorGenerator,
   repeatGenerator,
@@ -372,6 +382,8 @@ const ALL: InlineGenerator[] = [
   gateGenerator,
   gammaGenerator,
   grainGenerator,
+  // text-slot value modifier (seed ガチャの対象外)
+  typeMaskGenerator,
   // materials
   neonGenerator,
   inkGenerator,

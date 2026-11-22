@@ -15,6 +15,11 @@ The examples below assume sending to the local relay (`pnpm bridge`). When sendi
 | `seed <seed>` | Transitions to that seed's look **right now** |
 | `patch <file.json>` | Applies a Patch JSON **right now** (issues are returned if validation fails) |
 | `image <file> [--name <n>]` | Registers an image (png / jpg / webp / gif / svg / avif, up to 5 MB). Put the returned `hash` in the Patch's `images` to use it |
+| `text <opId[.slot]> [<string>] [--font <css>] [--weight <n>]` | Replaces the text of a type node (`type` family). `\n` is a line break; omit the string to clear ; pass `'*'` as the opId to write to all text slots ([Type nodes](../../guide/type-nodes/)) |
+| `pin <opId>` | Pins a text node of the current Patch (updates to the current value if already pinned). It is inserted into new Patches even after a seed change |
+| `pin --generator <type\|typeMask\|typeWarp> <string> [--font <css>] [--weight <n>] [--id <opId>]` | Creates a new pin from a string |
+| `unpin [<opId>]` | Removes a pin (omit to remove all) |
+| `pins` | Lists pinned text nodes |
 | `event add …` | Schedules an event on the Timeline (see below) |
 | `event remove <id>` | Cancels a scheduled event |
 | `lock <sec>` | Locks the Timeline for N seconds from now (relative) |

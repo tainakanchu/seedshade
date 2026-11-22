@@ -228,6 +228,49 @@ function validateImages(patch: VisualPatch, catalog: GeneratorCatalog): Validati
   return issues;
 }
 
+/**
+ * texts のキーも `<opId>.<slot>` で、実在する Operator の `textSlots` を指して
+ * いなければならない。画像スロットに文字列を（あるいはその逆を）割り当てるのは
+ * 構成ミスとして弾く。文字列の長さ・ウェイトの範囲は schema 側で検査済み。
+ */
+function validateTexts(patch: VisualPatch, catalog: GeneratorCatalog): ValidationIssue[] {
+  const texts = patch.texts;
+  if (!texts) return [];
+
+  const issues: ValidationIssue[] = [];
+  const opById = new Map(patch.operators.map((op) => [op.id, op]));
+
+  for (const key of Object.keys(texts)) {
+    const path = `texts.${key}`;
+    const parsed = parseTarget(key);
+    if (!parsed) {
+      issues.push(issue('invalid_text_key', `text key "${key}" must be "<opId>.<slot>"`, path));
+      continue;
+    }
+    const op = opById.get(parsed.opId);
+    if (!op) {
+      issues.push(issue('invalid_text_key', `text operator "${parsed.opId}" does not exist`, path));
+      continue;
+    }
+    const def = catalog.get(op.generatorId);
+    if (!def) continue; // unknown_generator は上流で報告済み
+    const slot = parsed.paramId;
+    const slots = def.textSlots ?? [];
+    if (!slots.includes(slot)) {
+      issues.push(
+        issue(
+          'unknown_text_slot',
+          `generator "${op.generatorId}" has no text slot "${slot}"` +
+            (slots.length > 0 ? ` (declared: ${slots.join(', ')})` : ' (declares none)'),
+          path,
+        ),
+      );
+    }
+  }
+
+  return issues;
+}
+
 export function validatePatch(patch: VisualPatch, catalog: GeneratorCatalog): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const operators = patch.operators;
@@ -430,6 +473,9 @@ export function validatePatch(patch: VisualPatch, catalog: GeneratorCatalog): Va
 
   // 11. images: every reference must land on a declared texture slot
   issues.push(...validateImages(patch, catalog));
+
+  // 12. texts: every string must land on a declared text slot
+  issues.push(...validateTexts(patch, catalog));
 
   return issues;
 }
