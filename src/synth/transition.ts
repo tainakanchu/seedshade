@@ -1,7 +1,9 @@
+import { inlineCatalog } from './generators';
 import type {
   CompositionSpec,
   ModulationRoute,
   PaletteSpec,
+  ParameterKind,
   TransitionEasing,
   TransitionSpec,
   VisualOperator,
@@ -73,6 +75,7 @@ function lerpParam(
   from: ParamValue | undefined,
   to: ParamValue | undefined,
   t: number,
+  kind?: ParameterKind,
 ): ParamValue {
   if (from === undefined && to === undefined) return 0;
   if (from === undefined) return to as ParamValue;
@@ -85,7 +88,7 @@ function lerpParam(
     return t < 0.5 ? from : to;
   }
   // both numbers
-  if (Number.isInteger(from) && Number.isInteger(to)) {
+  if (kind === 'int') {
     return Math.round(lerp(from, to, t));
   }
   return lerp(from, to, t);
@@ -106,7 +109,7 @@ function lerpPalette(from: PaletteSpec, to: PaletteSpec, t: number): PaletteSpec
 
 function lerpComposition(from: CompositionSpec, to: CompositionSpec, t: number): CompositionSpec {
   return {
-    symmetry: lerpParam(from.symmetry, to.symmetry, t) as number,
+    symmetry: Math.round(lerp(from.symmetry, to.symmetry, t)),
     scale: lerp(from.scale, to.scale, t),
     speed: lerp(from.speed, to.speed, t),
   };
@@ -115,10 +118,17 @@ function lerpComposition(from: CompositionSpec, to: CompositionSpec, t: number):
 function lerpOperators(from: VisualOperator[], to: VisualOperator[], t: number): VisualOperator[] {
   return from.map((fo, i) => {
     const toOp = to[i]!;
+    const gen = inlineCatalog.get(fo.generatorId);
     const keys = new Set([...Object.keys(fo.parameters), ...Object.keys(toOp.parameters)]);
     const parameters: Record<string, ParamValue> = {};
     for (const k of keys) {
-      parameters[k] = lerpParam(fo.parameters[k], toOp.parameters[k], t);
+      const paramDef = gen?.def.parameters.find((p) => p.id === k);
+      parameters[k] = lerpParam(
+        fo.parameters[k] ?? paramDef?.default,
+        toOp.parameters[k] ?? paramDef?.default,
+        t,
+        paramDef?.kind,
+      );
     }
     return {
       id: fo.id,

@@ -229,7 +229,28 @@ describe('synth/transition', () => {
   });
 
   describe('param interpolation', () => {
-    it('rounds integers when both sides are integers', () => {
+    it('interpolates float parameters with integer endpoints without rounding', () => {
+      const from = basePatch({ operators: [op('src', 'grid', { thickness: 0 })] });
+      const to = basePatch({ operators: [op('src', 'grid', { thickness: 1 })] });
+      const tr = createTransition(from, to, linearSpec(), 0);
+
+      expect(tr.sample(250).patch.operators[0]!.parameters.thickness).toBeCloseTo(0.25, 5);
+    });
+
+    it.each([
+      [{}, { thickness: 0.8 }, [0.08, 0.26, 0.8]],
+      [{ thickness: 0.8 }, {}, [0.8, 0.62, 0.08]],
+    ])('uses the catalog default for an omitted endpoint (%j → %j)', (a, b, values) => {
+      const from = basePatch({ operators: [op('src', 'grid', a)] });
+      const to = basePatch({ operators: [op('src', 'grid', b)] });
+      const tr = createTransition(from, to, linearSpec(), 0);
+
+      for (const [i, time] of [0, 250, 1000].entries()) {
+        expect(tr.sample(time).patch.operators[0]!.parameters.thickness).toBeCloseTo(values[i]!, 5);
+      }
+    });
+
+    it('rounds int-kind parameters and composition symmetry', () => {
       const from = basePatch({
         operators: [op('src', 'grid', { cells: 0 }), op('mat', 'neon', { hue: 0 })],
         composition: { symmetry: 1, scale: 1, speed: 1 },
@@ -240,6 +261,7 @@ describe('synth/transition', () => {
         composition: { symmetry: 5, scale: 1, speed: 1 },
       });
       const tr = createTransition(from, to, linearSpec({ parameterMs: 1000 }), 0);
+      expect(tr.sample(250).patch.operators[0]!.parameters.cells).toBe(3);
       const mid = tr.sample(500);
       expect(Number.isInteger(mid.patch.operators[0]!.parameters.cells)).toBe(true);
       expect(mid.patch.operators[0]!.parameters.cells).toBe(5);
