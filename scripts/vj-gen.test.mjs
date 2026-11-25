@@ -15,7 +15,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { MOTION_RATIO_MAX, MOTION_TARGET_PARAMS, ROUTE_SOURCES } from './vj-gen.mjs';
+import {
+  MOTION_RATIO_MAX,
+  MOTION_TARGET_PARAMS,
+  ROUTE_SOURCES,
+  validatePatchLocal,
+} from './vj-gen.mjs';
 
 const SCRIPT_DIR = fileURLToPath(new URL('.', import.meta.url));
 const VJ_GEN_PATH = join(SCRIPT_DIR, 'vj-gen.mjs');
@@ -202,5 +207,42 @@ describe('vj-gen.mjs audio-reactive safety rules', () => {
       patch.routes.filter((r) => r.source === 'audio:beatIntensity'),
     );
     expect(beatIntensityRoutes.length).toBeGreaterThan(0);
+  });
+});
+
+describe('canonical CLI patch validation', () => {
+  function patch() {
+    return {
+      schemaVersion: 1,
+      seed: 'validation',
+      qualityTier: 'medium',
+      operators: FIXTURE_CATALOG.map((def, i) => ({
+        id: `op${i}`,
+        generatorId: def.id,
+        generatorVersion: def.version,
+        parameters: {},
+      })),
+      routes: [],
+      palette: { mode: 'mono', hueOffset: 0, saturation: 50, lightness: 50 },
+      composition: { symmetry: 1, scale: 1, speed: 1 },
+    };
+  }
+  it('rejects cross-operator sources', () => {
+    const draft = patch();
+    expect(validatePatchLocal(draft, FIXTURE_CATALOG)).toEqual([]);
+    draft.routes.push({
+      source: 'operator:op1',
+      target: 'op0.amount',
+      amount: 0.1,
+      polarity: 'unipolar',
+      smoothing: 0,
+    });
+    expect(validatePatchLocal(draft, FIXTURE_CATALOG).join(' ')).toContain('is not a known form');
+  });
+  it('rejects operator IDs that collide after sanitization', () => {
+    const draft = patch();
+    draft.operators[0].id = 'op-0';
+    draft.operators[1].id = 'op_0';
+    expect(validatePatchLocal(draft, FIXTURE_CATALOG).join(' ')).toContain('duplicate operator id');
   });
 });

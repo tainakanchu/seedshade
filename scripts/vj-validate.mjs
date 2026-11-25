@@ -11,14 +11,8 @@
  *                                               画像テクスチャスロット参照）
  *   3. fitsBudget(estimateCost(...))（src/synth/cost.ts）— コスト / render budget
  *
- * vj-gen.mjs / vj-tweak.mjs のローカル検証は、この 2 と 3 相当を「CLI は .ts を
- * import できない」という前提のもとで手で複製したもの（3 は複製すらされておらず、
- * ローカル検証には budget チェックが**存在しない**）。この前提は誤りで、このスクリプト
- * は Vite の SSR モジュールローダー（`server.ssrLoadModule`、measure-coverage.mjs と
- * 同じ手法）で src/synth/{schema,validate,cost,catalog,generators/index}.ts を
- * そのまま実行する。複製ではなく本物を呼ぶので、サーバ側のルールが変わってもここが
- * 古くなることは構造的に無い。budget チェックも本物なので、ローカル検証では絶対に
- * 拾えなかった「サーバに送ったら render budget 超過で弾かれる」を送信前に検出できる。
+ * Vite の SSR モジュールローダー（`server.ssrLoadModule`）で src/synth/ 配下の .ts を
+ * そのまま実行するので、サーバ側のルールが変わってもここが古くなることは無い。
  *
  * 出力の約束:
  *   - OK  → `[OK] <file>` の下に、operator 構成（category:generatorId の並び）・
@@ -40,10 +34,7 @@ const USAGE = `使い方: node vj-validate.mjs <file.json>... [options]
 
 VisualPatch の JSON ファイルを、送信前にサーバ側の proposePatch と同じ検証ゲート
 （parsePatch → validatePatch → fitsBudget(estimateCost(...))、src/synth/apply.ts の
-gatePatchProposal と同じ並び）にかけてローカルで確認する。vj-gen.mjs / vj-tweak.mjs の
-ローカル検証と違い、Vite の SSR モジュールローダーで src/synth/ 配下の .ts を直接
-実行するので複製ではない。budget/cost チェック（vj-gen.mjs / vj-tweak.mjs のローカル
-検証には無い）も行う。
+gatePatchProposal と同じ並び）にかけてローカルで確認する。budget/cost チェックも行う。
 
 オプション:
   --stdin               1 つの patch を stdin から読む（file 引数とは同時に指定できない）

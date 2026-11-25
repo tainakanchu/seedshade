@@ -31,9 +31,9 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { AUDIO_SOURCES, SWELL_SOURCES } from './vj-gen.mjs';
+import { validatePatchLocal } from './vj-patch-validation.mjs';
 
-export { AUDIO_SOURCES };
+export { AUDIO_SOURCES } from './vj-patch-validation.mjs';
 
 /** vj-ctl.mjs の実体。同じ scripts/ ディレクトリに並ぶ前提で相対解決する。env で上書き可能。 */
 const VJ_CTL_PATH = process.env.VJ_CTL_PATH ?? `${import.meta.dirname}/vj-ctl.mjs`;
@@ -45,268 +45,12 @@ const VJ_CTL_PATH = process.env.VJ_CTL_PATH ?? `${import.meta.dirname}/vj-ctl.mj
  */
 const CATALOG_CACHE_PATH = `${import.meta.dirname}/.vj-catalog-cache.json`;
 
-// ---------------------------------------------------------------------------
-// 由来: src/synth/validate.ts の定数/関数をそのまま複製したもの（CLI は .ts を
-// import できないため）。AUDIO_SOURCES / SWELL_SOURCES は複製が古くなって落ちたので
-// vj-gen.mjs から import する。サーバ側のゲートと食い違うと「ローカルは通ったのに
-// サーバで弾かれる」が起きるので、validate.ts を変えたらここも合わせて直すこと。
-// ---------------------------------------------------------------------------
-
-const PALETTE_MODES = ['mono', 'analogous', 'complementary', 'triadic', 'rainbow'];
-
-const CATEGORY_RANK = { source: 0, field: 1, modifier: 2, material: 3 };
-
-const COUNT_LIMITS = {
-  source: { min: 1, max: 2 },
-  field: { min: 0, max: 2 },
-  modifier: { min: 1, max: 3 },
-  material: { min: 1, max: 1 },
-};
-
 /**
  * 由来: scripts/vj-ctl.mjs の TRANSITION_PRESETS のキー一覧だけを複製したもの。
  * 実際の ms 値（paletteMs 等）は vj-ctl.mjs 側（event add --transition）が解決するので、
  * ここでは名前が3つのうちどれかであることだけをローカルで確かめる。
  */
 const TRANSITION_KEYS = ['default', 'slow', 'cut'];
-
-/** parseTarget: "<opId>.<paramId>" を分解する（validate.ts と同じ判定）。 */
-function parseTarget(target) {
-  if (typeof target !== 'string') return null;
-  const dot = target.indexOf('.');
-  if (dot <= 0 || dot === target.length - 1) return null;
-  if (target.indexOf('.', dot + 1) !== -1) return null;
-  return { opId: target.slice(0, dot), paramId: target.slice(dot + 1) };
-}
-
-function validateParamValueLocal(paramDef, value, path) {
-  const issues = [];
-  switch (paramDef.kind) {
-    case 'number': {
-      if (typeof value !== 'number' || !Number.isFinite(value)) {
-        issues.push(
-          `parameter "${paramDef.id}" expects finite number, got ${typeof value} (${path})`,
-        );
-        break;
-      }
-      if (paramDef.min !== undefined && value < paramDef.min) {
-        issues.push(
-          `parameter "${paramDef.id}" value ${value} is below min ${paramDef.min} (${path})`,
-        );
-      }
-      if (paramDef.max !== undefined && value > paramDef.max) {
-        issues.push(
-          `parameter "${paramDef.id}" value ${value} is above max ${paramDef.max} (${path})`,
-        );
-      }
-      break;
-    }
-    case 'int': {
-      if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value)) {
-        issues.push(`parameter "${paramDef.id}" expects integer, got ${String(value)} (${path})`);
-        break;
-      }
-      if (paramDef.min !== undefined && value < paramDef.min) {
-        issues.push(
-          `parameter "${paramDef.id}" value ${value} is below min ${paramDef.min} (${path})`,
-        );
-      }
-      if (paramDef.max !== undefined && value > paramDef.max) {
-        issues.push(
-          `parameter "${paramDef.id}" value ${value} is above max ${paramDef.max} (${path})`,
-        );
-      }
-      break;
-    }
-    case 'bool': {
-      if (typeof value !== 'boolean') {
-        issues.push(`parameter "${paramDef.id}" expects boolean, got ${typeof value} (${path})`);
-      }
-      break;
-    }
-    case 'enum': {
-      if (typeof value !== 'string') {
-        issues.push(
-          `parameter "${paramDef.id}" expects string enum, got ${typeof value} (${path})`,
-        );
-        break;
-      }
-      const options = paramDef.options ?? [];
-      if (!options.includes(value)) {
-        issues.push(
-          `parameter "${paramDef.id}" value "${value}" is not in options [${options.join(', ')}] (${path})`,
-        );
-      }
-      break;
-    }
-  }
-  return issues;
-}
-
-function validatePatchLocal(patch, catalogArray) {
-  const issues = [];
-  const catalogMap = new Map(catalogArray.map((d) => [d.id, d]));
-  const operators = patch.operators;
-  const opById = new Map();
-  const seenIds = new Set();
-
-  // 1. unique operator ids
-  for (let i = 0; i < operators.length; i++) {
-    const op = operators[i];
-    if (seenIds.has(op.id)) {
-      issues.push(`duplicate operator id "${op.id}" (operators[${i}])`);
-    } else {
-      seenIds.add(op.id);
-      opById.set(op.id, op);
-    }
-  }
-
-  // 2-3. generator existence + version; 6. parameters
-  const categories = [];
-  for (let i = 0; i < operators.length; i++) {
-    const op = operators[i];
-    const def = catalogMap.get(op.generatorId);
-    if (!def) {
-      issues.push(
-        `generator "${op.generatorId}" not found in catalog (operators[${i}].generatorId)`,
-      );
-      categories.push(undefined);
-      continue;
-    }
-    if (def.version !== op.generatorVersion) {
-      issues.push(
-        `generator "${op.generatorId}" version ${op.generatorVersion} does not match catalog version ${def.version} (operators[${i}].generatorVersion)`,
-      );
-    }
-    categories.push(def.category);
-
-    const paramDefs = new Map(def.parameters.map((p) => [p.id, p]));
-    for (const [paramId, value] of Object.entries(op.parameters)) {
-      const path = `operators[${i}].parameters.${paramId}`;
-      const pd = paramDefs.get(paramId);
-      if (!pd) {
-        issues.push(
-          `parameter "${paramId}" is not defined on generator "${op.generatorId}" (${path})`,
-        );
-        continue;
-      }
-      issues.push(...validateParamValueLocal(pd, value, path));
-    }
-  }
-
-  // 4. stage order: non-decreasing category rank
-  let lastRank = -1;
-  for (let i = 0; i < categories.length; i++) {
-    const cat = categories[i];
-    if (cat === undefined) continue;
-    const rank = CATEGORY_RANK[cat];
-    if (rank < lastRank) {
-      issues.push(
-        `operators must be ordered Source → Field → Modifier → Material; found "${cat}" after higher stage (operators[${i}])`,
-      );
-    }
-    lastRank = Math.max(lastRank, rank);
-  }
-
-  // 5. count limits
-  const counts = { source: 0, field: 0, modifier: 0, material: 0 };
-  for (const cat of categories) if (cat !== undefined) counts[cat] += 1;
-  for (const cat of Object.keys(COUNT_LIMITS)) {
-    const { min, max } = COUNT_LIMITS[cat];
-    const n = counts[cat];
-    if (n < min || n > max) issues.push(`${cat} count must be ${min}-${max}, got ${n} (operators)`);
-  }
-
-  // 7-10. routes
-  for (let i = 0; i < patch.routes.length; i++) {
-    const route = patch.routes[i];
-    const basePath = `routes[${i}]`;
-
-    if (typeof route.amount !== 'number' || !Number.isFinite(route.amount)) {
-      issues.push(`route amount must be a finite number (${basePath}.amount)`);
-    }
-    if (typeof route.smoothing !== 'number' || !Number.isFinite(route.smoothing)) {
-      issues.push(`route smoothing must be a finite number (${basePath}.smoothing)`);
-    } else if (route.smoothing < 0) {
-      issues.push(`route smoothing must be >= 0 (${basePath}.smoothing)`);
-    }
-
-    const parsedTarget = parseTarget(route.target);
-    if (!parsedTarget) {
-      issues.push(`route target "${route.target}" must be "<opId>.<paramId>" (${basePath}.target)`);
-    } else {
-      const targetOp = opById.get(parsedTarget.opId);
-      if (!targetOp) {
-        issues.push(
-          `route target operator "${parsedTarget.opId}" does not exist (${basePath}.target)`,
-        );
-      } else {
-        const def = catalogMap.get(targetOp.generatorId);
-        const paramDef = def?.parameters.find((p) => p.id === parsedTarget.paramId);
-        if (!def || !paramDef) {
-          issues.push(
-            `route target parameter "${parsedTarget.paramId}" not found on operator "${parsedTarget.opId}" (${basePath}.target)`,
-          );
-        } else if (!paramDef.modulatable) {
-          issues.push(
-            `parameter "${parsedTarget.paramId}" on operator "${parsedTarget.opId}" is not modulatable (${basePath}.target)`,
-          );
-        }
-      }
-
-      if (route.source.startsWith('operator:')) {
-        const sourceOpId = route.source.slice('operator:'.length);
-        if (sourceOpId === parsedTarget.opId) {
-          issues.push(
-            `operator "${sourceOpId}" cannot modulate itself in the same frame (${basePath})`,
-          );
-        }
-      }
-    }
-
-    const source = route.source;
-    if (source === 'time' || AUDIO_SOURCES.has(source) || SWELL_SOURCES.has(source)) {
-      // ok
-    } else if (source.startsWith('operator:')) {
-      const sourceOpId = source.slice('operator:'.length);
-      if (!sourceOpId || !opById.has(sourceOpId)) {
-        issues.push(`route source operator "${sourceOpId}" does not exist (${basePath}.source)`);
-      }
-    } else {
-      issues.push(
-        `route source "${source}" is not a known form (audio:*, swell:*, time, operator:<opId>) (${basePath}.source)`,
-      );
-    }
-  }
-
-  // 11. palette.mode
-  if (!PALETTE_MODES.includes(patch.palette.mode)) {
-    issues.push(
-      `palette.mode "${patch.palette.mode}" is not a valid mode (valid: ${PALETTE_MODES.join(', ')})`,
-    );
-  }
-
-  return issues;
-}
-
-/**
- * validatePatchLocal は operators[] / routes[] / palette がすでにその形である
- * ことを前提にしている（vj-gen.mjs / vj-tweak.mjs の draft は常にその形なので
- * 問題にならない）。vj-set.mjs は任意の JSON ファイルをそのまま読むので、その
- * 前提が崩れていたら validatePatchLocal に投げる前にここで弾き、例外ではなく
- * issue として報告する。
- */
-function validatePatchShapeLocal(patch) {
-  if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
-    return ['patch must be a JSON object'];
-  }
-  if (!Array.isArray(patch.operators)) return ['patch.operators must be an array'];
-  if (!Array.isArray(patch.routes)) return ['patch.routes must be an array'];
-  if (patch.palette === null || typeof patch.palette !== 'object') {
-    return ['patch.palette must be an object'];
-  }
-  return [];
-}
 
 // ---------------------------------------------------------------------------
 // 引数
@@ -707,12 +451,6 @@ function cmdLoad(rest, flags, targetArgs) {
   const patchIssues = [];
   setObj.scenes.forEach((scene, i) => {
     const patch = resolved[i].patch;
-    const shapeIssues2 = validatePatchShapeLocal(patch);
-    if (shapeIssues2.length > 0) {
-      for (const issue of shapeIssues2)
-        patchIssues.push(`scenes[${i}] cue="${scene.cue}": ${issue}`);
-      return;
-    }
     for (const issue of validatePatchLocal(patch, catalogLoad.catalog)) {
       patchIssues.push(`scenes[${i}] cue="${scene.cue}": ${issue}`);
     }
