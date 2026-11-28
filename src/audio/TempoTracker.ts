@@ -11,6 +11,8 @@
  * pass (scratch copies), never per `update()`.
  */
 
+import { clamp } from '../lib/number';
+
 /** Output snapshot merged into every {@link import('./types').AudioFrame}. */
 export interface TempoState {
   /** Effective BPM, 0 until first lock (auto) / first tap (manual). */
@@ -72,10 +74,6 @@ const TAP_MAX_INTERVALS = 6;
 
 /** Lock threshold on confidence (auto mode). */
 const LOCK_CONFIDENCE = 0.35;
-
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}
 
 /** Fold a BPM by doubling/halving until it lands inside [lo, hi]. */
 function foldBpm(bpm: number, lo: number, hi: number): number {

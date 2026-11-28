@@ -30,6 +30,7 @@
  * 「音で画が消えることはない」を `derive.ts` の polarity 固定と `validate.ts` の
  * 許可リストで構造的に守っているので、無音時に定数オフセットが乗る出力は作らない。
  */
+import { clamp } from '../lib/number';
 import { smoothK } from './modulation';
 import { rand } from './rng';
 
@@ -176,19 +177,6 @@ export const SURGE_NORM = 0.35;
 export const MAX_DT = 0.1;
 
 /**
- * 0..1 に丸める。半波整流も兼ねる。
- *
- * `v <= 0` をまとめて `+0` に潰しているのは `-0` 対策。`eta * hs` は hs が 0 の
- * とき eta の符号を引き継いで `-0` になり、`Object.is(-0, 0)` が false なので
- * 「無音なら厳密に 0」を確かめる側から見ると別物に見えてしまう。
- * NaN はここを素通りする（呼び出し側の非有限ガードで落とす方が原因が分かる）。
- */
-function clamp01(v: number): number {
-  if (v <= 0) return 0;
-  return v > 1 ? 1 : v;
-}
-
-/**
  * JONSWAP スペクトルの**形状**。絶対スケールは後で正規化するので係数は要らない。
  *
  * `S(f) = f^-5 * exp(-1.25*(fp/f)^4) * GAMMA^r(f)`、
@@ -246,7 +234,7 @@ export function initialPhases(seed: string): number[] {
 
 /** 有義波高 0..1 に対するピーク周波数（Hz）。海が育つほど波が長くなる。 */
 export function peakFrequency(hs: number): number {
-  return FP_MAX - (FP_MAX - FP_MIN) * clamp01(hs);
+  return FP_MAX - (FP_MAX - FP_MIN) * clamp(hs, 0, 1);
 }
 
 export interface SwellState {
@@ -317,7 +305,7 @@ export function createSwellClock(seed: string): SwellClock {
       // dt を押さえるのは 2 次振動子を守るため（MAX_DT のコメント参照）。
       // NaN が 1 度でも入ると状態が永久に汚れるので、非有限はここで捨てる。
       const step = Number.isFinite(dt) ? Math.min(MAX_DT, Math.max(0, dt)) : 0;
-      const wind = Number.isFinite(energy) ? clamp01(energy) : 0;
+      const wind = Number.isFinite(energy) ? clamp(energy, 0, 1) : 0;
 
       // --- 海の記憶: 風 → 有義波高。育つより凪ぐ方が遅い。
       const hsTarget = Math.pow(wind, WIND_TO_HEIGHT_EXP);
@@ -363,15 +351,16 @@ export function createSwellClock(seed: string): SwellClock {
       // 次の波高が「入射波だけの関数」ではなく「入射波と岸の状態の関数」になる。
       // 掛けるのは出力と同じ正規化済みの値。こうしておくと SWELL_FEEDBACK が
       // 「最大 1.35 倍」をそのまま意味し、SURGE_NORM の較正から独立する。
-      const surge = clamp01(pooled * SURGE_NORM);
+      const surge = clamp(pooled * SURGE_NORM, 0, 1);
       const etaFed = eta * (1 + SWELL_FEEDBACK * surge);
 
       // --- 出力。すべて unipolar 0..1、無音（hs → 0）で必ず 0 に落ちる。
-      // wave / set は clamp01 が半波整流を兼ねる。谷が 0 なので「波の峰が来た瞬間」だけ立つ。
+      // wave / set は clamp が半波整流を兼ねる。谷が 0 なので「波の峰が来た瞬間」だけ立つ。
+      // 下限 +0 により、無音時に eta * hs が -0 でも出力は +0 になる。
       state = {
-        wave: clamp01(etaFed * hs * WAVE_NORM),
-        group: clamp01(envH * GROUP_NORM),
-        set: clamp01(igAc * hs * SET_NORM),
+        wave: clamp(etaFed * hs * WAVE_NORM, 0, 1),
+        group: clamp(envH * GROUP_NORM, 0, 1),
+        set: clamp(igAc * hs * SET_NORM, 0, 1),
         surge,
       };
       return state;

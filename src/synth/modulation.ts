@@ -8,6 +8,7 @@
  * ビートで爆発させるのではなく、音楽にゆったり呑まれるように状態を持つ。
  */
 import type { AudioFrame } from '../audio/types';
+import { clamp } from '../lib/number';
 import type { InlineGeneratorCatalog } from './generators/types';
 import type { SwellState } from './swell';
 import type { ModulationRoute, ParameterDefinition, VisualPatch } from './types';
@@ -204,10 +205,6 @@ const EMPTY_AUDIO_FOR_VALIDATE: AudioFrame = {
   tempoLocked: false,
   tempoMode: 'auto',
 };
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 function isNumericKind(kind: ParameterDefinition['kind']): boolean {
   return kind === 'number' || kind === 'int';
