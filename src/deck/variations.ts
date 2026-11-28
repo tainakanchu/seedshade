@@ -4,6 +4,7 @@
  * 同トポロジ・同 seed のままパラメータだけを動かす。ポン出しが in-place morph
  * （シェーダ再コンパイル無し）で済むようにするため。
  */
+import { clamp } from '../lib/number';
 import { createCatalog, type GeneratorCatalog } from '../synth/catalog';
 import { MOTION_RATIO_MAX, MOTION_TARGET_PARAMS } from '../synth/derive';
 import { allGeneratorDefinitions } from '../synth/generators';
@@ -307,10 +308,6 @@ function shortestHueDelta(from: number, to: number): number {
   if (d > 180) d -= 360;
   if (d <= -180) d += 360;
   return d;
-}
-
-function clamp(n: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, n));
 }
 
 function fmtNum(n: number, digits: number): string {

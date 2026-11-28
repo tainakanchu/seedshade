@@ -15,6 +15,7 @@
  * この時計は描画の見た目だけに効く。
  */
 import type { AudioFrame } from '../audio/types';
+import { clamp01 } from '../lib/number';
 import { smoothK } from './modulation';
 import { createSwellClock, type SwellState, ZERO_SWELL_STATE } from './swell';
 
@@ -63,10 +64,6 @@ export const ATTACK_TAU = 0.15;
  * ブレイクに入ってから静止するまでが 1 秒弱、という体感になる。
  */
 export const RELEASE_TAU = 0.8;
-
-function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
-}
 
 /**
  * AudioFrame から 0..1 のエネルギーを取り出す。

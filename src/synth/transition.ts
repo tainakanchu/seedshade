@@ -1,3 +1,4 @@
+import { clamp } from '../lib/number';
 import { inlineCatalog } from './generators';
 import type {
   CompositionSpec,
@@ -41,14 +42,8 @@ export interface Transition {
   sample(nowMs: number): TransitionSample;
 }
 
-function clamp01(t: number): number {
-  if (t <= 0) return 0;
-  if (t >= 1) return 1;
-  return t;
-}
-
 function applyEasing(t: number, easing: TransitionEasing): number {
-  const c = clamp01(t);
+  const c = clamp(t, 0, 1);
   if (easing === 'linear') return c;
   // smoothstep: 3t² - 2t³
   return c * c * (3 - 2 * c);

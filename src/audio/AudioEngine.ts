@@ -1,3 +1,4 @@
+import { clamp01 } from '../lib/number';
 import type { AudioFrame } from './types';
 import { TempoTracker, type TempoState } from './TempoTracker';
 
@@ -28,10 +29,6 @@ const TREBLE_RANGE: [number, number] = [2000, 16000];
  * the ControlPanel's lower-rate polling can't double-run it.
  */
 const FRAME_CACHE_MS = 5;
-
-function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
-}
 
 /**
  * Framework-free audio capture + analysis.
